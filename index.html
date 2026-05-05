@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>A.K Music</title>
+  <script>
+    (function () {
+      try {
+        var paletteMap = {
+          black:  { accent: '#ffffff', accent2: '#a3a3a3', bg: '#000000', surface: '#111111', text: '#FAFAFA' },
+          white:  { accent: '#000000', accent2: '#52525b', bg: '#FAFAFA', surface: '#E4E4E7', text: '#09090b' },
+          brown:  { accent: '#fca5a5', accent2: '#fcd34d', bg: '#291e18', surface: '#3f2d24', text: '#fff1f2' },
+          purple: { accent: '#c084fc', accent2: '#e879f9', bg: '#1c103f', surface: '#2e1b65', text: '#faf5ff' },
+          blue:   { accent: '#60a5fa', accent2: '#38bdf8', bg: '#0f172a', surface: '#1e293b', text: '#f8fafc' },
+          pink:   { accent: '#f472b6', accent2: '#fb7185', bg: '#2f1423', surface: '#4d2139', text: '#fdf2f8' },
+          green:  { accent: '#34d399', accent2: '#10b981', bg: '#062615', surface: '#064022', text: '#ecfdf5' },
+        };
+
+        function hexToRgb(hex) {
+          var normalized = hex.replace('#', '');
+          if (normalized.length !== 6) return '255, 155, 84';
+          var r = parseInt(normalized.slice(0, 2), 16);
+          var g = parseInt(normalized.slice(2, 4), 16);
+          var b = parseInt(normalized.slice(4, 6), 16);
+          return r + ', ' + g + ', ' + b;
+        }
+
+        var theme = window.localStorage.getItem('ak_theme') || 'white';
+        var palette = paletteMap[theme];
+
+        if (palette) {
+          var root = document.documentElement;
+          root.style.setProperty('--accent', palette.accent);
+          root.style.setProperty('--accent-2', palette.accent2);
+          root.style.setProperty('--accent-rgb', hexToRgb(palette.accent));
+          root.style.setProperty('--accent-2-rgb', hexToRgb(palette.accent2));
+          root.style.setProperty('--accent-glow', 'rgba(' + hexToRgb(palette.accent) + ', 0.34)');
+          root.style.setProperty('--primary', palette.accent);
+          root.style.setProperty('--bg-main', palette.bg);
+          root.style.setProperty('--surface', palette.surface);
+          root.style.setProperty('--text-main', palette.text);
+          document.body.style.backgroundColor = palette.bg;
+          document.body.style.color = palette.text;
+        }
+      } catch (e) { }
+    })();
+  </script>
+</head>
+
+<body>
+  <div id="root"></div>
+  <script type="module" src="/src/main.jsx"></script>
+</body>
+
+</html>

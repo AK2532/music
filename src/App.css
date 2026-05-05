@@ -1,0 +1,238 @@
+/* App.css — Global Redesign Styles */
+/* NOTE: Core color variables are set by ThemeContext.jsx at runtime.
+   Do NOT define --bg-main, --accent, or --glass-* here. */
+
+body {
+  background-color: var(--bg-main);
+  color: var(--text-main);
+  margin: 0;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  overflow-y: auto;
+}
+
+.main-container {
+  background:
+    radial-gradient(ellipse at 80% 0%, rgba(var(--accent-rgb), 0.14) 0%, transparent 55%),
+    radial-gradient(ellipse at 20% 100%, rgba(var(--accent-2-rgb), 0.10) 0%, transparent 50%),
+    var(--bg-main);
+  min-height: 100vh;
+}
+
+.app-sidebar {
+  background: var(--glass-bg) !important;
+  backdrop-filter: blur(30px) !important;
+  border-right: 1px solid var(--glass-border) !important;
+}
+
+.app-topbar {
+  background: transparent !important;
+  border-bottom: none !important;
+}
+
+.hud-glass {
+  background: var(--glass-bg) !important;
+  backdrop-filter: blur(20px) !important;
+  border: 1px solid var(--glass-border) !important;
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.05) !important;
+}
+
+.app-main {
+  flex: 1;
+  overflow-y: auto;
+  padding-bottom: 100px;
+  /* Space for miniplayer */
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* ── Mood Chips (SimpMusic vibe selector) ───────────────────────────── */
+.mood-chips {
+  display: flex;
+  gap: 0.55rem;
+  overflow-x: auto;
+  white-space: nowrap;
+  padding: 4px 0 12px;
+  margin-top: 0.25rem;
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE/Edge */
+}
+
+.mood-chips::-webkit-scrollbar {
+  display: none; /* Chrome/Safari */
+}
+
+.mood-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.45rem 1rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.mood-chip:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.18);
+  color: #fff;
+  transform: translateY(-1px);
+}
+
+.mood-chip--active {
+  background: var(--active-bg);
+  border-color: rgba(var(--accent-rgb), 0.55);
+  color: var(--accent);
+  box-shadow: 0 0 14px var(--accent-glow);
+}
+
+/* ── Search Category Chips ─────────────────────────────────────────── */
+.search-cats {
+  display: flex;
+  gap: 0.5rem;
+  overflow-x: auto;
+  white-space: nowrap;
+  padding: 4px 0 12px;
+  margin-top: 1rem;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.search-cats::-webkit-scrollbar {
+  display: none;
+}
+
+.search-cat-chip {
+  padding: 0.35rem 0.85rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.search-cat-chip:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+
+.search-cat-chip--active {
+  background: var(--active-bg);
+  border-color: rgba(var(--accent-rgb), 0.50);
+  color: var(--accent);
+}
+
+/* ── Artist Cards in Search ────────────────────────────────────────── */
+.search-artist-row {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.search-artist-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 1rem;
+  border-radius: 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  background: rgba(255, 255, 255, 0.03);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-width: 100px;
+  text-align: center;
+  color: #fff;
+}
+
+.search-artist-card:hover {
+  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(255, 255, 255, 0.15);
+  transform: translateY(-2px);
+}
+
+.search-artist-avatar {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid rgba(255, 255, 255, 0.1);
+}
+
+.search-artist-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.search-artist-card strong {
+  font-size: 0.82rem;
+  font-weight: 600;
+  max-width: 90px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.search-artist-wrapper {
+  position: relative;
+}
+
+.artist-radio-btn {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(79, 172, 254, 0.2);
+  border: 1px solid rgba(79, 172, 254, 0.4);
+  color: #4facfe;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  opacity: 0;
+  transform: scale(0.8);
+  transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+  z-index: 2;
+}
+
+.search-artist-wrapper:hover .artist-radio-btn {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.artist-radio-btn:hover {
+  background: #4facfe;
+  color: white;
+  box-shadow: 0 0 10px rgba(79, 172, 254, 0.4);
+}
