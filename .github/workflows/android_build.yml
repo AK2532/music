@@ -27,20 +27,26 @@ jobs:
 
       - name: Install Dependencies
         run: npm install --no-audit --no-fund
+        env:
+          NODE_OPTIONS: "--max-old-space-size=4096"
 
       - name: Build Web App
         run: npm run build
         env:
           CI: false
+          NODE_OPTIONS: "--max-old-space-size=4096"
 
       - name: Sync Capacitor
         run: npx cap sync android
+
+      - name: Accept Android SDK Licenses
+        run: yes | sdkmanager --licenses || true
 
       - name: Build with Gradle
         run: |
           cd android
           chmod +x gradlew
-          ./gradlew assembleDebug
+          ./gradlew assembleDebug --no-daemon
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
