@@ -227,13 +227,6 @@ export default function Welcome({ initialMode = 'landing' }) {
                   I already have an account
                 </motion.button>
 
-                <motion.button
-                  variants={fadeUp}
-                  onClick={handleDevLogin}
-                  className="auth-link-button"
-                >
-                  Continue as Guest
-                </motion.button>
               </motion.aside>
             </motion.div>
           )}
@@ -266,18 +259,6 @@ export default function Welcome({ initialMode = 'landing' }) {
                     {view === 'login' ? 'Enter your details to restore your library and preferences.' : 'Create an account to keep your profile, theme, and playback setup.'}
                   </p>
                 </div>
-
-                <div className="auth-provider-grid">
-                  <button onClick={() => handleOAuthLogin('google')} className="auth-provider-button">
-                    <GoogleIcon /> Google
-                  </button>
-                  <button onClick={() => handleOAuthLogin('apple')} className="auth-provider-button">
-                    <AppleIcon /> Apple
-                  </button>
-                </div>
-
-                <div className="auth-divider"><span>or use email</span></div>
-
                 <form onSubmit={handleEmailAuth} className="auth-form">
                   {view === 'signup' && (
                     <InputField
