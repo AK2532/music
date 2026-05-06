@@ -2,12 +2,13 @@ import express from 'express';
 import cors from 'cors';
 import YTMusic from 'ytmusic-api';
 import { spawn } from 'child_process';
-import { writeFileSync, readFileSync, existsSync } from 'fs';
+import { writeFileSync, readFileSync, existsSync, statSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import axios from 'axios';
 import { LRUCache } from 'lru-cache';
 import play from 'play-dl';
+import { fileURLToPath } from 'url';
 
 const app = express();
 app.use(cors({
@@ -28,23 +29,27 @@ app.use((req, res, next) => {
 const ytmusic = new YTMusic();
 await ytmusic.initialize();
 
+const __dirname = fileURLToPath(new URL('.', import.meta.url));
+
 // ─── Cookie Setup ─────────────────────────────────────────────────────────────
 let COOKIES_FILE = null;
 const rawCookies = process.env.YOUTUBE_COOKIES;
 if (rawCookies) {
   try {
-    // Clean the cookie string (remove accidental quotes or whitespace)
     const cleanedCookies = rawCookies.trim().replace(/^["']|["']$/g, '');
-    COOKIES_FILE = join(process.cwd(), 'yt_cookies.txt');
+    COOKIES_FILE = join(__dirname, 'yt_cookies.txt');
     writeFileSync(COOKIES_FILE, cleanedCookies, 'utf-8');
-    const firstLine = cleanedCookies.split('\n')[0].slice(0, 50);
-    console.log(`[Cookies] Cleaned & Loaded. First line: ${firstLine}`);
+    
+    if (existsSync(COOKIES_FILE)) {
+      const stats = statSync(COOKIES_FILE);
+      console.log(`[Cookies] Created at ${COOKIES_FILE} (${stats.size} bytes)`);
+    }
   } catch (e) {
     console.warn('[Cookies] Failed to write cookies file:', e.message);
     COOKIES_FILE = null;
   }
 } else {
-  console.warn('[Cookies] No YOUTUBE_COOKIES env var found.');
+  console.warn('[Cookies] No YOUTUBE_COOKIES found in environment.');
 }
 
 const streamCache = new LRUCache({ max: 1000, ttl: 1000 * 60 * 60 * 4 }); // 4hr cache (URLs valid ~6hr)
@@ -728,8 +733,9 @@ async function getStreamUrl(videoId) {
 
   const attempts = [
     { name: 'TV Client', args: [...baseFlags, '-f', 'ba/best', '--extractor-args', 'youtube:player_client=tvhtml5', ytUrl] },
+    { name: 'Android Music', args: [...baseFlags, '-f', 'ba/best', '--extractor-args', 'youtube:player_client=android_music', ytUrl] },
     { name: 'iOS/Web', args: [...baseFlags, '-f', 'ba[ext=m4a]/ba/best', '--extractor-args', 'youtube:player_client=ios,web', ytUrl] },
-    { name: 'Android', args: [...baseFlags, '-f', 'ba/best', '--extractor-args', 'youtube:player_client=android', ytUrl] },
+    { name: 'IPv4 Fallback', args: [...baseFlags, '--force-ipv4', '-f', 'ba/best', ytUrl] },
     { name: 'Emergency', args: [...baseFlags, '-f', 'b/worst', ytUrl] }
   ];
 
