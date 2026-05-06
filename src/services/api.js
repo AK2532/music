@@ -4,7 +4,7 @@ const API_BASE = import.meta.env.VITE_API_BASE || '/api';
 
 const api = axios.create({
   baseURL: API_BASE,
-  timeout: 15000, // 15 seconds timeout
+  timeout: 30000, // 30 seconds timeout
 });
 
 async function getData(request, fallback = null) {

@@ -626,8 +626,9 @@ async function getStreamUrl(videoId) {
       '-g', 
       '-f', 'bestaudio/best', 
       '--no-warnings', 
-      '--user-agent', USER_AGENT,
-      '--extractor-args', 'youtube:player_client=android,web',
+      '--user-agent', 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Mobile/15E148 Safari/604.1',
+      '--extractor-args', 'youtube:player_client=ios',
+      '--add-header', 'Accept-Language: en-US,en;q=0.9',
       `https://www.youtube.com/watch?v=${videoId}`
     ]);
     
