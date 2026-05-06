@@ -2,6 +2,9 @@ import express from 'express';
 import cors from 'cors';
 import YTMusic from 'ytmusic-api';
 import { spawn } from 'child_process';
+import { writeFileSync, existsSync } from 'fs';
+import { tmpdir } from 'os';
+import { join } from 'path';
 import axios from 'axios';
 import { LRUCache } from 'lru-cache';
 
@@ -24,9 +27,27 @@ app.use((req, res, next) => {
 const ytmusic = new YTMusic();
 await ytmusic.initialize();
 
-const streamCache = new LRUCache({ max: 1000, ttl: 1000 * 60 * 60 * 2 });
+// ─── Cookie Setup ─────────────────────────────────────────────────────────────
+// Write YouTube cookies from env var to a temp file so yt-dlp can use them.
+// This makes requests look like a real logged-in user — undetectable by YouTube.
+let COOKIES_FILE = null;
+const rawCookies = process.env.YOUTUBE_COOKIES;
+if (rawCookies) {
+  try {
+    COOKIES_FILE = join(tmpdir(), 'yt_cookies.txt');
+    writeFileSync(COOKIES_FILE, rawCookies, 'utf-8');
+    console.log('[Cookies] YouTube cookies loaded from environment variable.');
+  } catch (e) {
+    console.warn('[Cookies] Failed to write cookies file:', e.message);
+    COOKIES_FILE = null;
+  }
+} else {
+  console.warn('[Cookies] No YOUTUBE_COOKIES env var found. Streaming may be blocked by YouTube.');
+}
+
+const streamCache = new LRUCache({ max: 1000, ttl: 1000 * 60 * 60 * 4 }); // 4hr cache (URLs valid ~6hr)
 const relatedCache = new LRUCache({ max: 500, ttl: 1000 * 60 * 30 });
-const homeCache = new LRUCache({ max: 20, ttl: 1000 * 30 }); // 30 seconds for home cache to keep it fresh
+const homeCache = new LRUCache({ max: 20, ttl: 1000 * 30 });
 
 // ─── SimpMusic Mood Params (copied directly) ──────────────────────────────────
 const HOME_PARAMS = {
@@ -621,23 +642,34 @@ app.get('/api/charts', async (req, res) => {
   }
 });
 
-// Stream / Download — yt-dlp installed via pip in build (see render.yaml)
+// ─── Streaming ────────────────────────────────────────────────────────────────
 const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
 
 async function getStreamUrl(videoId) {
   if (streamCache.has(videoId)) return streamCache.get(videoId);
 
   return new Promise((resolve, reject) => {
-    const child = spawn('yt-dlp', [
+    const args = [
       '-g',
       '-f', 'bestaudio[ext=webm]/bestaudio/best',
       '--no-warnings',
       '--user-agent', USER_AGENT,
-      '--extractor-args', 'youtube:player_client=ios',
       '--add-header', 'Accept-Language: en-US,en;q=0.9',
-      `https://www.youtube.com/watch?v=${videoId}`
-    ]);
+    ];
 
+    // Use cookies if available (most reliable bypass)
+    if (COOKIES_FILE) {
+      args.push('--cookies', COOKIES_FILE);
+      console.log(`[Stream] Using cookies for ${videoId}`);
+    } else {
+      // Fallback: use iOS client emulation
+      args.push('--extractor-args', 'youtube:player_client=ios');
+      console.log(`[Stream] No cookies — using iOS client fallback for ${videoId}`);
+    }
+
+    args.push(`https://www.youtube.com/watch?v=${videoId}`);
+
+    const child = spawn('yt-dlp', args);
     let out = '', err = '';
     child.stdout.on('data', d => out += d.toString());
     child.stderr.on('data', d => err += d.toString());
@@ -648,12 +680,12 @@ async function getStreamUrl(videoId) {
         if (url) { streamCache.set(videoId, url); resolve(url); }
         else reject(new Error('No URL in yt-dlp output'));
       } else {
-        console.error(`[Stream] yt-dlp failed for ${videoId}: ${err.slice(0, 200)}`);
-        reject(new Error(`yt-dlp error: ${err.slice(0, 200)}`));
+        console.error(`[Stream] yt-dlp failed for ${videoId}: ${err.slice(0, 300)}`);
+        reject(new Error(`yt-dlp error: ${err.slice(0, 300)}`));
       }
     });
 
-    child.on('error', e => reject(new Error(`yt-dlp not found. Ensure it is installed via pip: ${e.message}`)));
+    child.on('error', e => reject(new Error(`yt-dlp not found: ${e.message}`)));
   });
 }
 
