@@ -73,6 +73,7 @@ export function useAudioEngine() {
   const loadingTimeoutRef = useRef(null);
   const sponsorSegmentsRef = useRef([]);
   const isNewSongLoadingRef = useRef(false);
+  const consecutiveErrorsRef = useRef(0);
   const stateRef = useRef({
     isPlaying: false,
     isMuted: false,
@@ -286,6 +287,7 @@ export function useAudioEngine() {
     const onWaiting = () => setLoading(true);
     const onCanPlay = () => setLoading(false);
     const onEnded = () => {
+      consecutiveErrorsRef.current = 0; // Successful play — reset error counter
       if (repeatMode === 'one') {
         audio.currentTime = 0;
         audio.play().catch(() => {});
@@ -298,6 +300,15 @@ export function useAudioEngine() {
       clearTimeout(loadingTimeoutRef.current);
       setLoading(false);
       setPlaying(false);
+      consecutiveErrorsRef.current += 1;
+
+      if (consecutiveErrorsRef.current >= 3) {
+        // Backend is likely down — stop auto-skipping to avoid an infinite refresh loop
+        console.error('Multiple audio load failures. Stopping auto-skip to prevent refresh loop.');
+        consecutiveErrorsRef.current = 0;
+        return;
+      }
+
       console.error('Audio failed to load. Skipping to next track in 2s.');
       setTimeout(() => playNext(), 2000);
     };

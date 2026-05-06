@@ -15,99 +15,99 @@ const ThemeContext = createContext();
  */
 const paletteMap = {
 
-  // ── BLACK ── True Black: Pitch black background, pure white accents
+  // ── OBSIDIAN ── True OLED black, monochrome silver accents
   black: {
     accent: '#ffffff', accent2: '#a3a3a3',
-    bg: '#000000', surface: '#0a0a0a',
+    bg: '#000000', surface: '#111111',
     text: '#ffffff', textMuted: '#a1a1aa', textFaint: '#52525b',
-    glassBg: 'rgba(10, 10, 10, 0.85)', glassBorder: 'rgba(255, 255, 255, 0.12)',
+    glassBg: 'rgba(10, 10, 10, 0.88)', glassBorder: 'rgba(255, 255, 255, 0.12)',
     btnPrimary: '#ffffff', btnPrimaryText: '#000000',
     hoverBg: 'rgba(255, 255, 255, 0.08)', activeBg: 'rgba(255, 255, 255, 0.15)',
     navActiveBg: '#ffffff', navActiveText: '#000000',
     label: 'Obsidian',
   },
 
-  // ── NEBULA ── Cosmic: Deep violet/purple, magenta highlights
+  // ── NEBULA ── Rich violet-purple world, magenta highlights
   nebula: {
-    accent: '#e040fb', accent2: '#7c4dff',
-    bg: '#0e0520', surface: '#1a0b38',
-    text: '#f3e6ff', textMuted: '#c49ddd', textFaint: '#5c3678',
-    glassBg: 'rgba(26, 11, 56, 0.85)', glassBorder: 'rgba(224, 64, 251, 0.22)',
-    btnPrimary: '#e040fb', btnPrimaryText: '#0e0520',
-    hoverBg: 'rgba(224, 64, 251, 0.12)', activeBg: 'rgba(224, 64, 251, 0.22)',
-    navActiveBg: '#e040fb', navActiveText: '#0e0520',
+    accent: '#d946ef', accent2: '#a855f7',
+    bg: '#1a0a2e', surface: '#2d1552',
+    text: '#f5eeff', textMuted: '#c4a8e0', textFaint: '#7c5a9e',
+    glassBg: 'rgba(45, 21, 82, 0.82)', glassBorder: 'rgba(217, 70, 239, 0.25)',
+    btnPrimary: '#d946ef', btnPrimaryText: '#1a0a2e',
+    hoverBg: 'rgba(217, 70, 239, 0.14)', activeBg: 'rgba(217, 70, 239, 0.25)',
+    navActiveBg: '#d946ef', navActiveText: '#1a0a2e',
     label: 'Nebula',
   },
 
-  // ── LAVA ── Intense: Dark charcoal-red, fiery orange-red
+  // ── LAVA ── Warm charcoal with smoldering ember tones, fiery orange-red
   lava: {
-    accent: '#ff5722', accent2: '#ff1744',
-    bg: '#120a08', surface: '#22100c',
-    text: '#ffe8e3', textMuted: '#e08070', textFaint: '#6b2d22',
-    glassBg: 'rgba(34, 16, 12, 0.85)', glassBorder: 'rgba(255, 87, 34, 0.22)',
-    btnPrimary: '#ff5722', btnPrimaryText: '#120a08',
-    hoverBg: 'rgba(255, 87, 34, 0.12)', activeBg: 'rgba(255, 87, 34, 0.22)',
-    navActiveBg: '#ff5722', navActiveText: '#120a08',
+    accent: '#ff5722', accent2: '#ff7043',
+    bg: '#1c0f0a', surface: '#2e1810',
+    text: '#fff0eb', textMuted: '#d4907a', textFaint: '#8c4d38',
+    glassBg: 'rgba(46, 24, 16, 0.82)', glassBorder: 'rgba(255, 87, 34, 0.25)',
+    btnPrimary: '#ff5722', btnPrimaryText: '#1c0f0a',
+    hoverBg: 'rgba(255, 87, 34, 0.14)', activeBg: 'rgba(255, 87, 34, 0.25)',
+    navActiveBg: '#ff5722', navActiveText: '#1c0f0a',
     label: 'Lava',
   },
 
-  // ── JUNGLE ── Organic: Deep forest green, mint highlights
+  // ── JUNGLE ── Dark teal-green forest, vivid emerald highlights
   jungle: {
-    accent: '#00e676', accent2: '#1de9b6',
-    bg: '#050f0a', surface: '#0a1e14',
-    text: '#e0fff2', textMuted: '#6dbf93', textFaint: '#1c5538',
-    glassBg: 'rgba(10, 30, 20, 0.85)', glassBorder: 'rgba(0, 230, 118, 0.20)',
-    btnPrimary: '#00e676', btnPrimaryText: '#050f0a',
-    hoverBg: 'rgba(0, 230, 118, 0.10)', activeBg: 'rgba(0, 230, 118, 0.20)',
-    navActiveBg: '#00e676', navActiveText: '#050f0a',
+    accent: '#22c55e', accent2: '#34d399',
+    bg: '#0a1a14', surface: '#122e22',
+    text: '#e8fdf2', textMuted: '#7cc9a0', textFaint: '#3d7a5a',
+    glassBg: 'rgba(18, 46, 34, 0.82)', glassBorder: 'rgba(34, 197, 94, 0.22)',
+    btnPrimary: '#22c55e', btnPrimaryText: '#0a1a14',
+    hoverBg: 'rgba(34, 197, 94, 0.12)', activeBg: 'rgba(34, 197, 94, 0.22)',
+    navActiveBg: '#22c55e', navActiveText: '#0a1a14',
     label: 'Jungle',
   },
 
-  // ── SAKURA ── Elegant: Deep wine/cherry bg, vibrant rose-pink
+  // ── SAKURA ── Dusty rose-wine with warm pink blossoms
   sakura: {
-    accent: '#ff4d8d', accent2: '#ff80ab',
-    bg: '#130610', surface: '#241020',
-    text: '#ffe8f5', textMuted: '#d97fb0', textFaint: '#6d2355',
-    glassBg: 'rgba(36, 16, 32, 0.85)', glassBorder: 'rgba(255, 77, 141, 0.22)',
-    btnPrimary: '#ff4d8d', btnPrimaryText: '#130610',
-    hoverBg: 'rgba(255, 77, 141, 0.12)', activeBg: 'rgba(255, 77, 141, 0.22)',
-    navActiveBg: '#ff4d8d', navActiveText: '#130610',
+    accent: '#f472b6', accent2: '#fb7185',
+    bg: '#1e0c18', surface: '#33162b',
+    text: '#fdf0f6', textMuted: '#d98eb5', textFaint: '#8a4470',
+    glassBg: 'rgba(51, 22, 43, 0.82)', glassBorder: 'rgba(244, 114, 182, 0.25)',
+    btnPrimary: '#f472b6', btnPrimaryText: '#1e0c18',
+    hoverBg: 'rgba(244, 114, 182, 0.14)', activeBg: 'rgba(244, 114, 182, 0.25)',
+    navActiveBg: '#f472b6', navActiveText: '#1e0c18',
     label: 'Sakura',
   },
 
-  // ── ARCTIC ── Crisp: Deep navy, ice-blue accent
+  // ── ARCTIC ── Deep slate-blue ocean, icy cyan accent
   arctic: {
-    accent: '#40c4ff', accent2: '#80d8ff',
-    bg: '#04101a', surface: '#091e30',
-    text: '#e8f6ff', textMuted: '#6ab0d4', textFaint: '#1e4a6a',
-    glassBg: 'rgba(9, 30, 48, 0.85)', glassBorder: 'rgba(64, 196, 255, 0.20)',
-    btnPrimary: '#40c4ff', btnPrimaryText: '#04101a',
-    hoverBg: 'rgba(64, 196, 255, 0.10)', activeBg: 'rgba(64, 196, 255, 0.20)',
-    navActiveBg: '#40c4ff', navActiveText: '#04101a',
+    accent: '#38bdf8', accent2: '#67e8f9',
+    bg: '#0b1828', surface: '#152a42',
+    text: '#edf6ff', textMuted: '#7cb8db', textFaint: '#3a6a8a',
+    glassBg: 'rgba(21, 42, 66, 0.82)', glassBorder: 'rgba(56, 189, 248, 0.22)',
+    btnPrimary: '#38bdf8', btnPrimaryText: '#0b1828',
+    hoverBg: 'rgba(56, 189, 248, 0.12)', activeBg: 'rgba(56, 189, 248, 0.22)',
+    navActiveBg: '#38bdf8', navActiveText: '#0b1828',
     label: 'Arctic',
   },
 
-  // ── EMBER ── Luxury: Near-black with rich gold
+  // ── EMBER ── Warm dark bronze, rich gold highlights
   ember: {
-    accent: '#ffab00', accent2: '#ffd740',
-    bg: '#0f0e0a', surface: '#1e1b12',
-    text: '#fff8e6', textMuted: '#c9a84c', textFaint: '#5a4820',
-    glassBg: 'rgba(30, 27, 18, 0.85)', glassBorder: 'rgba(255, 171, 0, 0.22)',
-    btnPrimary: '#ffab00', btnPrimaryText: '#0f0e0a',
-    hoverBg: 'rgba(255, 171, 0, 0.12)', activeBg: 'rgba(255, 171, 0, 0.22)',
-    navActiveBg: '#ffab00', navActiveText: '#0f0e0a',
+    accent: '#f59e0b', accent2: '#fbbf24',
+    bg: '#181208', surface: '#2a2010',
+    text: '#fff9ec', textMuted: '#d4a954', textFaint: '#7a6230',
+    glassBg: 'rgba(42, 32, 16, 0.82)', glassBorder: 'rgba(245, 158, 11, 0.25)',
+    btnPrimary: '#f59e0b', btnPrimaryText: '#181208',
+    hoverBg: 'rgba(245, 158, 11, 0.14)', activeBg: 'rgba(245, 158, 11, 0.25)',
+    navActiveBg: '#f59e0b', navActiveText: '#181208',
     label: 'Ember',
   },
 
-  // ── MOCHA ── Cozy: Dark coffee brown, warm cream accents
+  // ── MOCHA ── Rich dark-brown leather, warm cream and caramel
   mocha: {
-    accent: '#e8a87c', accent2: '#f4c99e',
-    bg: '#100d0b', surface: '#211a15',
-    text: '#fdf3ec', textMuted: '#b89070', textFaint: '#5e3e2c',
-    glassBg: 'rgba(33, 26, 21, 0.85)', glassBorder: 'rgba(232, 168, 124, 0.22)',
-    btnPrimary: '#e8a87c', btnPrimaryText: '#100d0b',
-    hoverBg: 'rgba(232, 168, 124, 0.12)', activeBg: 'rgba(232, 168, 124, 0.22)',
-    navActiveBg: '#e8a87c', navActiveText: '#100d0b',
+    accent: '#e8a87c', accent2: '#f0c4a0',
+    bg: '#16100c', surface: '#2c2018',
+    text: '#fdf3ec', textMuted: '#c0977a', textFaint: '#7a5840',
+    glassBg: 'rgba(44, 32, 24, 0.82)', glassBorder: 'rgba(232, 168, 124, 0.25)',
+    btnPrimary: '#e8a87c', btnPrimaryText: '#16100c',
+    hoverBg: 'rgba(232, 168, 124, 0.14)', activeBg: 'rgba(232, 168, 124, 0.25)',
+    navActiveBg: '#e8a87c', navActiveText: '#16100c',
     label: 'Mocha',
   },
 };

@@ -23,8 +23,8 @@ export function MiniPlayer({ onExpand, isMobile }) {
 
   useEffect(() => {
     if (song && containerRef.current) {
-      gsap.fromTo(containerRef.current, 
-        { y: 150, opacity: 0 }, 
+      gsap.fromTo(containerRef.current,
+        { y: 150, opacity: 0 },
         { y: 0, opacity: 1, duration: 0.8, ease: "power4.out" }
       );
     }
@@ -66,37 +66,37 @@ export function MiniPlayer({ onExpand, isMobile }) {
       </div>
 
       {/* Album Art (Physical Drop Shadow) */}
-      <img 
-        src={song.thumbnail} 
-        alt="" 
-        style={{ 
-          width: '56px', 
-          height: '56px', 
-          borderRadius: '12px', 
-          objectFit: 'cover', 
+      <img
+        src={song.thumbnail}
+        alt=""
+        style={{
+          width: '56px',
+          height: '56px',
+          borderRadius: '12px',
+          objectFit: 'cover',
           boxShadow: '0 8px 24px rgba(28,26,23,0.2)',
           marginRight: '16px'
-        }} 
+        }}
       />
 
       {/* Editorial Info */}
       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-        <div style={{ 
-          fontWeight: 600, 
-          fontSize: '1rem', 
+        <div style={{
+          fontWeight: 600,
+          fontSize: '1rem',
           color: 'var(--text-main)',
-          whiteSpace: 'nowrap', 
-          overflow: 'hidden', 
-          textOverflow: 'ellipsis' 
+          whiteSpace: 'nowrap',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis'
         }}>
           {song.title}
         </div>
-        <div style={{ 
-          fontSize: '0.8rem', 
-          color: 'var(--text-faint)', 
-          whiteSpace: 'nowrap', 
-          overflow: 'hidden', 
-          textOverflow: 'ellipsis' 
+        <div style={{
+          fontSize: '0.8rem',
+          color: 'var(--text-faint)',
+          whiteSpace: 'nowrap',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis'
         }}>
           {song.artist}
         </div>
@@ -104,27 +104,25 @@ export function MiniPlayer({ onExpand, isMobile }) {
 
       {/* Solid Dark Controls */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }} onClick={(e) => e.stopPropagation()}>
-        {!isMobile && (
-          <button className="icon-btn" onClick={playPrev} style={{ width: '40px', height: '40px', background: 'transparent', border: 'none', boxShadow: 'none' }}>
-            <SkipBack size={20} color="var(--text-muted)" />
-          </button>
-        )}
-        <button 
-          className="btn-primary" 
-          onClick={togglePlay} 
+        <button className="icon-btn" onClick={playPrev} style={{ width: '40px', height: '40px', background: 'transparent', border: 'none', boxShadow: 'none' }}>
+          <SkipBack size={20} color="var(--text-muted)" />
+        </button>
+        <button
+          className="btn-primary"
+          onClick={togglePlay}
           style={{ width: '48px', height: '48px', padding: 0, justifyContent: 'center', borderRadius: '50%' }}
         >
           {isPlaying ? <Pause size={20} fill="currentColor" /> : <Play size={20} fill="currentColor" style={{ marginLeft: 2 }} />}
         </button>
-        <button 
-          className="icon-btn" 
-          onClick={playNext} 
+        <button
+          className="icon-btn"
+          onClick={playNext}
           disabled={!radioMode && repeatMode === 'none' && currentIndex >= queue.length - 1}
-          style={{ 
-            width: '40px', 
-            height: '40px', 
-            background: 'transparent', 
-            border: 'none', 
+          style={{
+            width: '40px',
+            height: '40px',
+            background: 'transparent',
+            border: 'none',
             boxShadow: 'none',
             opacity: (!radioMode && repeatMode === 'none' && currentIndex >= queue.length - 1) ? 0.3 : 1
           }}

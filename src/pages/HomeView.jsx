@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { ArrowUpToLine, Download, ListMusic, ListPlus, MoreVertical, Pause, Play, Radio, Sparkles, TrendingUp } from 'lucide-react';
 import { gsap } from 'gsap';
 import { MOOD_PARAMS, usePlayerStore } from '../stores/playerStore';
+import { BrandLogo } from '../components/BrandLogo';
 
 const getGreeting = () => {
   const h = new Date().getHours();
@@ -165,7 +166,7 @@ const CompactTrackRow = ({ item, onActivate, metadata }) => (
   </div>
 );
 
-const HomeView = ({ songs = [], sections = [], moods = [], onPlay, onPlayCollection, metadata, activeMood = 'default', onMoodChange, currentSong, isPlaying }) => {
+const HomeView = ({ songs = [], sections = [], moods = [], onPlay, onPlayCollection, metadata, activeMood = 'default', onMoodChange, currentSong, isPlaying, isLoading }) => {
   const containerRef = useRef(null);
 
   // Randomize hero per session using a stable seed from session start
@@ -185,7 +186,7 @@ const HomeView = ({ songs = [], sections = [], moods = [], onPlay, onPlayCollect
       gsap.to('.premium-meter i', { scaleY: () => gsap.utils.random(0.35, 1.1), duration: () => gsap.utils.random(0.6, 1.2), repeat: -1, yoyo: true, ease: 'sine.inOut', stagger: 0.08 });
     }, containerRef);
     return () => ctx.revert();
-  }, [songs, sections, moods, activeMood, currentSong]);
+  }, []); // Run entrance animations ONLY once on mount
 
   return (
     <div ref={containerRef} className="premium-home">
@@ -262,7 +263,20 @@ const HomeView = ({ songs = [], sections = [], moods = [], onPlay, onPlayCollect
         </div>
       </section>
 
-      {/* ── Mood-filtered tracks ──────────────────────────────────────────── */}
+      {/* ── Dynamic Content Area ──────────────────────────────────────────── */}
+      <div style={{ position: 'relative', transition: 'opacity 0.3s ease', opacity: isLoading ? 0.4 : 1, pointerEvents: isLoading ? 'none' : 'auto', minHeight: '300px' }}>
+        {isLoading && (
+          <div style={{ position: 'absolute', top: '4rem', left: '50%', transform: 'translateX(-50%)', zIndex: 10, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+            <motion.div
+              animate={{ opacity: [0.6, 1, 0.6], scale: [0.95, 1.05, 0.95] }}
+              transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut' }}
+            >
+              <BrandLogo size={56} color="var(--text-main)" />
+            </motion.div>
+          </div>
+        )}
+
+        {/* ── Mood-filtered tracks ──────────────────────────────────────────── */}
       {topTracks.length > 0 ? (
         <section className="premium-section" data-home-reveal>
           <div className="premium-section__head premium-section__head--row">
@@ -347,6 +361,7 @@ const HomeView = ({ songs = [], sections = [], moods = [], onPlay, onPlayCollect
           </section>
         );
       })}
+      </div>
     </div>
   );
 };

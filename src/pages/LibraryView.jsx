@@ -56,8 +56,8 @@ export default function LibraryView({ songs = [], onPlay, currentSong, isPlaying
   ];
 
   return (
-    <div style={{ display: 'grid', gap: '5rem', paddingBottom: '4rem' }}>
-      
+    <div className="view-padding library-view-main">
+
       <header className="editorial-section" style={{ borderBottom: '1px solid var(--text-faint)', paddingBottom: '2rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
         <p className="mono-label">Personal Collection</p>
         <h1 className="library-header-title">
@@ -88,37 +88,39 @@ export default function LibraryView({ songs = [], onPlay, currentSong, isPlaying
       </header>
 
       <AnimatePresence mode="wait">
-        
+
         {/* LIKED SONGS */}
         {tab === 'likes' && (
           <motion.section key="likes" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="editorial-section">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', borderBottom: '1px solid var(--text-faint)', paddingBottom: '1rem', marginBottom: '2rem' }}>
-              <h3 style={{ fontSize: '2rem' }}>Saved Tracks</h3>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                <span className="mono-label">{likedSongs.length} Tracks</span>
-                {likedSongs.length > 0 && (
-                  <button className="btn-primary" onClick={() => onPlay(likedSongs[0], likedSongs)} style={{ padding: '0.5rem 1.25rem', fontSize: '0.9rem' }}>
+            <div className="editorial-section-head">
+              <div>
+                <p className="mono-label">{likedSongs.length} tracks</p>
+                <h3 className="editorial-title">Saved Tracks</h3>
+              </div>
+              {likedSongs.length > 0 && (
+                <div className="editorial-actions">
+                  <button className="btn-primary" onClick={() => onPlay(likedSongs[0], likedSongs)}>
                     <Play size={16} fill="currentColor" /> Play All
                   </button>
-                )}
-              </div>
+                </div>
+              )}
             </div>
 
             {likedSongs.length ? (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '2rem' }}>
+              <div className="song-card-grid">
                 {likedSongs.map((song) => (
                   <div key={song.id} className="glass-panel" onClick={() => onPlay(song, likedSongs)} style={{ display: 'flex', flexDirection: 'column', gap: '1rem', cursor: 'pointer', padding: '1rem' }}>
                     <div style={{ width: '100%', aspectRatio: '1/1', borderRadius: '12px', overflow: 'hidden' }}>
-                      <img 
-                        src={song.thumbnail} 
-                        alt={song.title} 
-                        style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                      <img
+                        src={song.thumbnail}
+                        alt={song.title}
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                         referrerPolicy="no-referrer"
                         onError={(e) => {
                           if (e.target.src.includes('maxresdefault')) {
                             e.target.src = e.target.src.replace('maxresdefault', 'hqdefault');
                           } else {
-                            e.target.onerror = null; 
+                            e.target.onerror = null;
                             e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(song.title || 'Music')}&background=random&size=512`;
                           }
                         }}
@@ -144,24 +146,22 @@ export default function LibraryView({ songs = [], onPlay, currentSong, isPlaying
         {/* PLAYLISTS */}
         {tab === 'playlists' && (
           <motion.section key="playlists" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="editorial-section">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', borderBottom: '1px solid var(--text-faint)', paddingBottom: '1rem', marginBottom: '2rem' }}>
-              <h3 style={{ fontSize: '2rem' }}>Playlists</h3>
-              <button 
-                className="btn-primary" 
-                onClick={() => setModal({
-                  isOpen: true,
-                  type: 'prompt',
-                  title: 'New Playlist',
-                  value: '',
-                  onConfirm: (val) => {
-                    const name = val.trim().slice(0, 20);
-                    if (name) setSelectedPlaylistId(createPlaylist(name));
-                  }
-                })}
-                style={{ padding: '0.5rem 1.25rem', fontSize: '0.9rem' }}
-              >
-                <Plus size={16} /> New Playlist
-              </button>
+            <div className="editorial-section-head">
+              <div>
+                <p className="mono-label">{playlists.length} playlists</p>
+                <h3 className="editorial-title">Playlists</h3>
+              </div>
+              <div className="editorial-actions">
+                <button
+                  className="btn-primary"
+                  onClick={() => setModal({
+                    isOpen: true, type: 'prompt', title: 'New Playlist', value: '',
+                    onConfirm: (val) => { const name = val.trim().slice(0, 20); if (name) setSelectedPlaylistId(createPlaylist(name)); }
+                  })}
+                >
+                  <Plus size={16} /> New Playlist
+                </button>
+              </div>
             </div>
 
             {!playlists.length ? (
@@ -171,74 +171,64 @@ export default function LibraryView({ songs = [], onPlay, currentSong, isPlaying
                 <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', maxWidth: '340px', margin: '0 auto' }}>Create a playlist to organise your favourite tracks. Click "New Playlist" above to get started.</p>
               </div>
             ) : (
-              <div className="library-grid">
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                  {playlists.map((playlist) => (
-                    <div 
-                      key={playlist.id} 
-                      className={`glass-panel library-playlist-item ${effectiveSelectedPlaylistId === playlist.id ? 'is-active' : ''}`}
-                      onClick={() => setSelectedPlaylistId(playlist.id)}
-                    >
-                      <button type="button" onClick={() => setSelectedPlaylistId(playlist.id)} style={{ flex: 1, textAlign: 'left', minWidth: 0 }}>
-                        <div style={{ fontSize: '1.1rem', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{playlist.name}</div>
-                        <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginTop: '0.25rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{playlist.songs.length} {playlist.songs.length === 1 ? 'track' : 'tracks'}</div>
-                      </button>
-                      <div style={{ display: 'flex', gap: '0.5rem' }}>
-                        <button className="icon-btn" onClick={() => playPlaylist(playlist.id)} style={{ width: '36px', height: '36px' }}>
-                          <Play size={16} fill="currentColor" />
-                        </button>
-                        <button className="icon-btn" onClick={(e) => { 
-                          e.stopPropagation();
-                          setModal({
-                            isOpen: true,
-                            type: 'confirm',
-                            title: 'Delete Playlist',
-                            message: `Are you sure you want to delete "${playlist.name}"?`,
-                            onConfirm: () => deletePlaylist(playlist.id)
-                          });
-                        }} style={{ width: '36px', height: '36px' }}>
-                          <Trash2 size={16} color="var(--text-muted)" />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="glass-panel" style={{ padding: '2rem' }}>
-                  {selectedPlaylist && (
-                    <>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', borderBottom: '1px solid var(--text-faint)', paddingBottom: '1rem' }}>
-                        <div style={{ minWidth: 0, flex: 1 }}>
-                          <h3 style={{ fontSize: '2rem', marginBottom: '0.25rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{selectedPlaylist.name}</h3>
-                          <p className="mono-label">{selectedPlaylist.songs.length} tracks</p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                {playlists.map((playlist) => {
+                  const isExpanded = effectiveSelectedPlaylistId === playlist.id;
+                  return (
+                    <div key={playlist.id} className="glass-panel" style={{ overflow: 'hidden' }}>
+                      {/* Playlist header row */}
+                      <div
+                        className="library-playlist-item"
+                        style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.85rem 1rem', cursor: 'pointer' }}
+                        onClick={() => setSelectedPlaylistId(isExpanded ? null : playlist.id)}
+                      >
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: '1rem', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{playlist.name}</div>
+                          <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginTop: '2px' }}>{playlist.songs.length} {playlist.songs.length === 1 ? 'track' : 'tracks'}</div>
                         </div>
-                        {selectedPlaylist.songs.length > 0 && (
-                          <button className="btn-primary" onClick={() => playPlaylist(selectedPlaylist.id)}>
-                            Play Playlist
+                        <div style={{ display: 'flex', gap: '0.5rem', flexShrink: 0 }}>
+                          <button className="icon-btn" style={{ width: '34px', height: '34px' }} onClick={(e) => { e.stopPropagation(); playPlaylist(playlist.id); }}>
+                            <Play size={15} fill="currentColor" />
                           </button>
-                        )}
+                          <button className="icon-btn" style={{ width: '34px', height: '34px' }} onClick={(e) => {
+                            e.stopPropagation();
+                            setModal({ isOpen: true, type: 'confirm', title: 'Delete Playlist', message: `Delete "${playlist.name}"?`, onConfirm: () => deletePlaylist(playlist.id) });
+                          }}>
+                            <Trash2 size={15} color="var(--text-muted)" />
+                          </button>
+                        </div>
                       </div>
 
-                      {selectedPlaylist.songs.length ? (
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '1.5rem' }}>
-                          {selectedPlaylist.songs.map((song) => (
-                            <div key={song.id} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', cursor: 'pointer' }} onClick={() => playPlaylist(selectedPlaylist.id, song)}>
-                              <div style={{ width: '100%', aspectRatio: '1/1', borderRadius: '12px', overflow: 'hidden' }}>
-                                <img src={song.thumbnail} alt={song.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                              </div>
-                              <div>
-                                <div style={{ fontSize: '1rem', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{song.title}</div>
-                                <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{song.artist}</div>
+                      {/* Expanded track list */}
+                      {isExpanded && (
+                        <div style={{ borderTop: '1px solid var(--text-faint)', padding: '0.75rem 1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                          {playlist.songs.length === 0 ? (
+                            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', textAlign: 'center', padding: '1rem 0' }}>This playlist is empty.</p>
+                          ) : playlist.songs.map((song) => (
+                            <div
+                              key={song.id}
+                              style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.5rem', borderRadius: '10px', cursor: 'pointer', transition: 'background 0.15s' }}
+                              onClick={() => playPlaylist(playlist.id, song)}
+                              onMouseOver={e => e.currentTarget.style.background = 'rgba(255,255,255,0.04)'}
+                              onMouseOut={e => e.currentTarget.style.background = 'transparent'}
+                            >
+                              <img
+                                src={song.thumbnail}
+                                alt={song.title}
+                                style={{ width: '42px', height: '42px', borderRadius: '8px', objectFit: 'cover', flexShrink: 0 }}
+                                onError={(e) => { e.target.onerror = null; e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(song.title)}&background=random&size=128`; }}
+                              />
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ fontSize: '0.95rem', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{song.title}</div>
+                                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{song.artist}</div>
                               </div>
                             </div>
                           ))}
                         </div>
-                      ) : (
-                        <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '2rem 0' }}>This playlist is empty.</div>
                       )}
-                    </>
-                  )}
-                </div>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </motion.section>
@@ -247,28 +237,34 @@ export default function LibraryView({ songs = [], onPlay, currentSong, isPlaying
         {/* QUEUE */}
         {tab === 'queue' && (
           <motion.section key="queue" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="editorial-section">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', borderBottom: '1px solid var(--text-faint)', paddingBottom: '1rem', marginBottom: '2rem' }}>
-              <h3 style={{ fontSize: '2rem' }}>Up Next</h3>
-              <div style={{ display: 'flex', gap: '1rem' }}>
+            <div className="editorial-section-head">
+              <div>
+                <p className="mono-label">{queue.length} songs</p>
+                <h3 className="editorial-title">Up Next</h3>
+              </div>
+              <div className="editorial-actions">
                 {queue.length > 0 && (
-                  <button className="icon-btn" style={{ width: 'auto', padding: '0 1rem', borderRadius: '999px', gap: '0.5rem' }} onClick={() => setModal({
-                    isOpen: true,
-                    type: 'prompt',
-                    title: 'Save Queue',
-                    value: '',
-                    onConfirm: (val) => {
-                      const name = val.trim().slice(0, 20);
-                      if (!name) return;
-                      const playlistId = createPlaylist(name);
-                      queue.forEach((song) => addToPlaylist(playlistId, song));
-                      setSelectedPlaylistId(playlistId);
-                      setTab('playlists');
-                    }
-                  })}>
-                    <Save size={16} /> Save
+                  <button
+                    className="btn-ghost"
+                    onClick={() => setModal({
+                      isOpen: true, type: 'prompt', title: 'Save Queue', value: '',
+                      onConfirm: (val) => {
+                        const name = val.trim().slice(0, 20);
+                        if (!name) return;
+                        const playlistId = createPlaylist(name);
+                        queue.forEach((song) => addToPlaylist(playlistId, song));
+                        setSelectedPlaylistId(playlistId);
+                        setTab('playlists');
+                      }
+                    })}
+                  >
+                    <Save size={15} /> Save
                   </button>
                 )}
-                <button className="icon-btn" style={{ width: 'auto', padding: '0 1rem', borderRadius: '999px', gap: '0.5rem' }} onClick={clearQueue}>
+                <button
+                  className="btn-ghost"
+                  onClick={clearQueue}
+                >
                   Clear
                 </button>
               </div>
@@ -277,35 +273,35 @@ export default function LibraryView({ songs = [], onPlay, currentSong, isPlaying
             {queue.length ? (
               <div className="glass-panel" style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                 {queue.map((song, index) => (
-                  <div key={`${song.id}-${index}`} style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '0.75rem 1rem', background: currentSong?.id === song.id ? 'rgba(255,255,255,0.05)' : 'transparent', borderRadius: '12px' }}>
-                    <div className="mono-label" style={{ width: '24px', textAlign: 'right' }}>{index + 1}</div>
-                    <img 
-                      src={song.thumbnail} 
-                      alt="" 
-                      style={{ width: '48px', height: '48px', borderRadius: '8px', objectFit: 'cover' }} 
+                  <div key={`${song.id}-${index}`} className="queue-item" style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '0.75rem 1rem', background: currentSong?.id === song.id ? 'rgba(var(--accent-rgb), 0.08)' : 'transparent', borderRadius: '16px', border: currentSong?.id === song.id ? '1px solid var(--glass-border)' : '1px solid transparent', transition: 'all 0.2s' }}>
+                    <div className="mono-label" style={{ width: '24px', textAlign: 'right', opacity: 0.5 }}>{index + 1}</div>
+                    <img
+                      src={song.thumbnail}
+                      alt=""
+                      style={{ width: '44px', height: '44px', borderRadius: '8px', objectFit: 'cover', boxShadow: '0 4px 12px rgba(0,0,0,0.2)' }}
                       referrerPolicy="no-referrer"
                       onError={(e) => {
                         if (e.target.src.includes('maxresdefault')) {
                           e.target.src = e.target.src.replace('maxresdefault', 'hqdefault');
                         } else {
-                          e.target.onerror = null; 
+                          e.target.onerror = null;
                           e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(song.title || 'Music')}&background=random&size=512`;
                         }
                       }}
                     />
                     <button style={{ flex: 1, textAlign: 'left', minWidth: 0 }} onClick={() => playSongAt(song)}>
-                      <div style={{ fontSize: '1.1rem', fontWeight: 600, color: currentSong?.id === song.id ? 'var(--text-main)' : 'inherit', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{song.title}</div>
-                      <div style={{ fontSize: '0.9rem', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{(typeof song.artist === 'object' ? song.artist?.name : song.artist)}</div>
+                      <div style={{ fontSize: '1rem', fontWeight: 600, color: currentSong?.id === song.id ? 'var(--text-main)' : 'inherit', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{song.title}</div>
+                      <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{(typeof song.artist === 'object' ? song.artist?.name : song.artist)}</div>
                     </button>
-                    <div style={{ display: 'flex', gap: '0.25rem' }}>
-                      <button className="icon-btn" style={{ width: '32px', height: '32px' }} onClick={() => reorderQueue(index, index - 1)} disabled={index === 0}>
-                        <ChevronUp size={16} />
+                    <div className="queue-item-actions" style={{ display: 'flex', gap: '0.25rem' }}>
+                      <button className="icon-btn" style={{ width: '32px', height: '32px', background: 'rgba(255,255,255,0.03)' }} onClick={() => reorderQueue(index, index - 1)} disabled={index === 0}>
+                        <ChevronUp size={14} />
                       </button>
-                      <button className="icon-btn" style={{ width: '32px', height: '32px' }} onClick={() => reorderQueue(index, index + 1)} disabled={index === queue.length - 1}>
-                        <ChevronDown size={16} />
+                      <button className="icon-btn" style={{ width: '32px', height: '32px', background: 'rgba(255,255,255,0.03)' }} onClick={() => reorderQueue(index, index + 1)} disabled={index === queue.length - 1}>
+                        <ChevronDown size={14} />
                       </button>
-                      <button className="icon-btn" style={{ width: '32px', height: '32px' }} onClick={() => removeFromQueue(song.id)}>
-                        <Trash2 size={16} />
+                      <button className="icon-btn" style={{ width: '32px', height: '32px', background: 'rgba(255,255,255,0.03)' }} onClick={() => removeFromQueue(song.id)}>
+                        <Trash2 size={14} />
                       </button>
                     </div>
                   </div>
@@ -322,36 +318,41 @@ export default function LibraryView({ songs = [], onPlay, currentSong, isPlaying
         {/* HISTORY */}
         {tab === 'history' && (
           <motion.section key="history" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="editorial-section">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', borderBottom: '1px solid var(--text-faint)', paddingBottom: '1rem', marginBottom: '2rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                <Clock3 size={28} />
-                <h3 style={{ fontSize: '2rem' }}>History</h3>
+            <div className="editorial-section-head">
+              <div>
+                <p className="mono-label">{historyDescending.length} tracks</p>
+                <h3 className="editorial-title">Listening History</h3>
               </div>
             </div>
             {historyDescending.length ? (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '2rem' }}>
+              <div className="glass-panel" style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', padding: '0.75rem' }}>
                 {historyDescending.map((song) => (
-                  <div key={`${song.playedAt}-${song.id}`} className="glass-panel" onClick={() => onPlay(song, historyDescending)} style={{ display: 'flex', flexDirection: 'column', gap: '1rem', cursor: 'pointer', padding: '1rem' }}>
-                    <div style={{ width: '100%', aspectRatio: '1/1', borderRadius: '12px', overflow: 'hidden' }}>
-                      <img 
-                        src={song.thumbnail} 
-                        alt={song.title} 
-                        style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
-                        referrerPolicy="no-referrer"
-                        onError={(e) => {
-                          if (e.target.src.includes('maxresdefault')) {
-                            e.target.src = e.target.src.replace('maxresdefault', 'hqdefault');
-                          } else {
-                            e.target.onerror = null; 
-                            e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(song.title || 'Music')}&background=random&size=512`;
-                          }
-                        }}
-                      />
+                  <div
+                    key={`${song.playedAt}-${song.id}`}
+                    style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.6rem 0.75rem', borderRadius: '12px', cursor: 'pointer', transition: 'background 0.15s' }}
+                    onClick={() => onPlay(song, historyDescending)}
+                    onMouseOver={e => e.currentTarget.style.background = 'rgba(255,255,255,0.04)'}
+                    onMouseOut={e => e.currentTarget.style.background = 'transparent'}
+                  >
+                    <img
+                      src={song.thumbnail}
+                      alt={song.title}
+                      style={{ width: '48px', height: '48px', borderRadius: '10px', objectFit: 'cover', flexShrink: 0 }}
+                      referrerPolicy="no-referrer"
+                      onError={(e) => {
+                        if (e.target.src.includes('maxresdefault')) {
+                          e.target.src = e.target.src.replace('maxresdefault', 'hqdefault');
+                        } else {
+                          e.target.onerror = null;
+                          e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(song.title || 'Music')}&background=random&size=128`;
+                        }
+                      }}
+                    />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: '0.95rem', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{song.title}</div>
+                      <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{(typeof song.artist === 'object' ? song.artist?.name : song.artist)}</div>
                     </div>
-                    <div>
-                      <h4 style={{ fontSize: '1.1rem', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{song.title}</h4>
-                      <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{(typeof song.artist === 'object' ? song.artist?.name : song.artist)}</p>
-                    </div>
+                    <Clock3 size={14} style={{ color: 'var(--text-muted)', flexShrink: 0, opacity: 0.5 }} />
                   </div>
                 ))}
               </div>
@@ -366,36 +367,36 @@ export default function LibraryView({ songs = [], onPlay, currentSong, isPlaying
         {/* STATS */}
         {tab === 'stats' && (
           <motion.section key="stats" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="editorial-section">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', borderBottom: '1px solid var(--text-faint)', paddingBottom: '1rem', marginBottom: '2rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                <ListMusic size={28} />
-                <h3 style={{ fontSize: '2rem' }}>Top Played</h3>
+            <div className="editorial-section-head">
+              <div>
+                <p className="mono-label">All time</p>
+                <h3 className="editorial-title">Top Played</h3>
               </div>
             </div>
 
             <div className="glass-panel" style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
               {topTracks.length ? topTracks.map((song, index) => (
-                <div key={song.id} style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', padding: '1rem', background: 'rgba(255,255,255,0.02)', borderRadius: '12px' }}>
-                  <div className="mono-label" style={{ width: '24px', textAlign: 'right', fontSize: '1.2rem' }}>{index + 1}</div>
-                  <img 
-                    src={song.thumbnail} 
-                    alt="" 
-                    style={{ width: '64px', height: '64px', borderRadius: '12px', objectFit: 'cover' }} 
+                <div key={song.id} className="library-stats-row" style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', padding: '1rem', background: 'rgba(255,255,255,0.02)', borderRadius: '12px' }}>
+                  <div className="mono-label stats-rank" style={{ width: '24px', textAlign: 'right', fontSize: '1.2rem' }}>{index + 1}</div>
+                  <img
+                    src={song.thumbnail}
+                    alt=""
+                    style={{ width: '56px', height: '56px', borderRadius: '12px', objectFit: 'cover', flexShrink: 0 }}
                     referrerPolicy="no-referrer"
                     onError={(e) => {
                       if (e.target.src.includes('maxresdefault')) {
                         e.target.src = e.target.src.replace('maxresdefault', 'hqdefault');
                       } else {
-                        e.target.onerror = null; 
+                        e.target.onerror = null;
                         e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(song.title || 'Music')}&background=random&size=512`;
                       }
                     }}
                   />
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: '1.2rem', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{song.title}</div>
-                    <div style={{ fontSize: '0.95rem', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{song.artist}</div>
+                    <div className="library-stats-title" style={{ fontSize: '1rem', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{song.title}</div>
+                    <div className="library-stats-artist" style={{ fontSize: '0.85rem', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{song.artist}</div>
                   </div>
-                  <div style={{ fontSize: '1.1rem', fontWeight: 800 }}>{playCounts[song.id] || 0} <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 500 }}>plays</span></div>
+                  <div className="library-stats-count" style={{ fontSize: '1rem', fontWeight: 800, flexShrink: 0 }}>{playCounts[song.id] || 0} <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 500 }}>plays</span></div>
                 </div>
               )) : (
                 <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '1.2rem' }}>

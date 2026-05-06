@@ -485,8 +485,26 @@ app.get('/api/lyrics/:videoId', async (req, res) => {
       if (!params.q) continue;
       try {
         const lrcRes = await axios.get('https://lrclib.net/api/search', { params, timeout: 4000 });
-        const best = lrcRes.data.find(i => i.syncedLyrics || i.plainLyrics);
-        if (best) {
+        const results = lrcRes.data.filter(i => i.syncedLyrics || i.plainLyrics);
+        if (results.length > 0) {
+          const scored = results.map(item => {
+            let score = 0;
+            const text = item.syncedLyrics || item.plainLyrics || '';
+            if (item.syncedLyrics) score += 10;
+            
+            // Prefer Romanized/ASCII text for wider readability
+            const asciiChars = (text.match(/[a-zA-Z]/g) || []).length;
+            const totalChars = text.replace(/\s+/g, '').length || 1;
+            if ((asciiChars / totalChars) > 0.4) score += 20;
+            
+            if (item.trackName?.toLowerCase() === cleanTitle.toLowerCase()) score += 5;
+            if (item.artistName?.toLowerCase().includes(cleanArtist.toLowerCase())) score += 5;
+            
+            return { item, score };
+          });
+          
+          scored.sort((a, b) => b.score - a.score);
+          const best = scored[0].item;
           console.log(`[Lyrics] Found on LRCLIB via query: ${params.q}`);
           const synced = best.syncedLyrics;
           if (synced) {
@@ -504,6 +522,18 @@ app.get('/api/lyrics/:videoId', async (req, res) => {
             return res.json({ provider: 'LRCLIB', source: 'LRCLIB', synced: true, text: synced, lines: lines.filter(l => l.text) });
           }
           return res.json({ provider: 'LRCLIB', source: 'LRCLIB', synced: false, text: best.plainLyrics || '', lines: [] });
+        }
+      } catch (_) { }
+    }
+
+    // 3. Try lyrics.ovh
+    if (cleanArtist && cleanTitle) {
+      try {
+        const ovhRes = await axios.get(`https://api.lyrics.ovh/v1/${encodeURIComponent(cleanArtist)}/${encodeURIComponent(cleanTitle)}`, { timeout: 3000 });
+        if (ovhRes.data?.lyrics) {
+          console.log(`[Lyrics] Found on lyrics.ovh for ${cleanTitle}`);
+          // some ovh lyrics start with "Paroles de la chanson..." which we can optionally strip, but we'll take it raw.
+          return res.json({ provider: 'lyrics.ovh', source: 'lyrics.ovh', synced: false, text: ovhRes.data.lyrics, lines: [] });
         }
       } catch (_) { }
     }

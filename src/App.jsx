@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { gsap } from 'gsap';
-import { Home, Library, Search, Settings, Download, Loader2, Menu, X } from 'lucide-react';
+import { Home, Library, Search, Settings, Download, Loader2, Menu, X, ChevronLeft } from 'lucide-react';
 import { musicService } from './services/api';
 import { getUserMetadata, logout, supabase, updateMetadata } from './services/supabase';
 import { useTheme } from './services/ThemeContext';
@@ -87,6 +87,17 @@ function FloatingNav({ location }) {
         </div>
         
         <div className="global-nav__actions">
+          {/* Android Back Button — mobile only */}
+          <button
+            type="button"
+            className="mobile-only icon-btn"
+            style={{ width: '40px', height: '40px', background: 'transparent', border: 'none', boxShadow: 'none', marginRight: '4px' }}
+            onClick={() => window.history.back()}
+            aria-label="Go back"
+          >
+            <ChevronLeft size={26} />
+          </button>
+
           {/* Mobile Menu Toggle */}
           <button 
             type="button" 
@@ -148,6 +159,7 @@ const App = () => {
   const [user, setUser] = useState(null);
   const [metadata, setMetadata] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [isHomeLoading, setIsHomeLoading] = useState(false);
   const [collectionLoading, setCollectionLoading] = useState(false);
   const [songs, setSongs] = useState([]);
   const [homeSections, setHomeSections] = useState([]);
@@ -197,6 +209,7 @@ const App = () => {
   useMediaSession();
 
   const loadHome = useCallback(async (mood = 'default') => {
+    setIsHomeLoading(true);
     try {
       const data = await musicService.getHome(mood);
       const chartSongs = normalizeSongs(data?.charts?.length ? data.charts : fallbackSongs);
@@ -208,6 +221,8 @@ const App = () => {
       setSongs(normalizeSongs(fallbackSongs));
       setHomeSections([]);
       setMoodSections([]);
+    } finally {
+      setIsHomeLoading(false);
     }
   }, []);
 
@@ -243,6 +258,8 @@ const App = () => {
   }, []);
 
   useEffect(() => {
+    let initialLoadDone = false;
+
     const initApp = async () => {
       const safetyTimeout = setTimeout(() => setLoading(false), 5000);
       try {
@@ -252,7 +269,10 @@ const App = () => {
           const devMeta = cachedMeta ? JSON.parse(cachedMeta) : { username: 'dev_guest', theme: 'white', downloadPref: 'ask' };
           setUser({ id: 'dev-user-id', displayName: 'Dev User' });
           setMetadata(devMeta);
-          await loadHome(activeMood);
+          if (!initialLoadDone) {
+            initialLoadDone = true;
+            await loadHome(activeMood);
+          }
           return;
         }
 
@@ -264,7 +284,10 @@ const App = () => {
           const meta = await getUserMetadata(sessionUser.id);
           if (meta) setMetadata(meta);
         }
-        await loadHome(activeMood);
+        if (!initialLoadDone) {
+          initialLoadDone = true;
+          await loadHome(activeMood);
+        }
       } catch (error) {
         console.error('App init error:', error);
       } finally {
@@ -291,7 +314,10 @@ const App = () => {
         if (meta) {
           setMetadata(meta);
           // Only load home if we haven't already or if it's a new sign in
-          if (event === 'SIGNED_IN') await loadHome(activeMood);
+          if (event === 'SIGNED_IN' && !initialLoadDone) {
+            initialLoadDone = true;
+            await loadHome(activeMood);
+          }
         }
       }
     });
@@ -473,6 +499,7 @@ const App = () => {
                           onMoodChange={(mood) => { setActiveMood(mood); loadHome(mood); }}
                           currentSong={currentSong}
                           isPlaying={isPlaying}
+                          isLoading={isHomeLoading}
                         />
                       }
                     />
@@ -484,27 +511,26 @@ const App = () => {
                 </PageTransition>
               </AnimatePresence>
             </main>
+
+            {/* MiniPlayer persists across ALL pages while music is playing */}
+            <PlaylistPicker />
+            <DownloadPicker />
+            <MiniPlayer onExpand={openPlayer} isMobile={isMobile} />
+            <AnimatePresence>
+              {nowPlayingOpen ? (
+                <NowPlayingFull 
+                  audioRef={audioRef} 
+                  onClose={closePlayer} 
+                  onSeek={seek} 
+                  metadata={metadata} 
+                />
+              ) : null}
+            </AnimatePresence>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {!loading && user && metadata && (
-        <>
-          <PlaylistPicker />
-          <DownloadPicker />
-          <MiniPlayer onExpand={openPlayer} isMobile={isMobile} />
-          <AnimatePresence>
-            {nowPlayingOpen ? (
-              <NowPlayingFull 
-                audioRef={audioRef} 
-                onClose={closePlayer} 
-                onSeek={seek} 
-                metadata={metadata} 
-              />
-            ) : null}
-          </AnimatePresence>
-        </>
-      )}
+      {/* Overlays outside route transitions — always available */}
     </div>
   );
 };
