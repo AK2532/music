@@ -645,48 +645,63 @@ app.get('/api/charts', async (req, res) => {
 // ─── Streaming ────────────────────────────────────────────────────────────────
 const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
 
-async function getStreamUrl(videoId) {
-  if (streamCache.has(videoId)) return streamCache.get(videoId);
-
+async function runYtDlp(args) {
   return new Promise((resolve, reject) => {
-    const args = [
-      '-g',
-      '-f', '140/251/250/249/bestaudio[acodec=mp4a]/bestaudio[acodec=opus]/bestaudio/best',
-      '--no-warnings',
-      '--user-agent', USER_AGENT,
-      '--add-header', 'Accept-Language: en-US,en;q=0.9',
-    ];
-
-    // Use cookies if available (most reliable bypass)
-    if (COOKIES_FILE) {
-      args.push('--cookies', COOKIES_FILE);
-      console.log(`[Stream] Using cookies for ${videoId}`);
-    } else {
-      // Fallback: use iOS client emulation
-      args.push('--extractor-args', 'youtube:player_client=ios');
-      console.log(`[Stream] No cookies — using iOS client fallback for ${videoId}`);
-    }
-
-    args.push(`https://www.youtube.com/watch?v=${videoId}`);
-
     const child = spawn('yt-dlp', args);
     let out = '', err = '';
     child.stdout.on('data', d => out += d.toString());
     child.stderr.on('data', d => err += d.toString());
-
     child.on('close', code => {
       if (code === 0) {
         const url = out.trim().split('\n')[0].trim();
-        if (url) { streamCache.set(videoId, url); resolve(url); }
-        else reject(new Error('No URL in yt-dlp output'));
+        if (url) resolve(url);
+        else reject(new Error('Empty output'));
       } else {
-        console.error(`[Stream] yt-dlp failed for ${videoId}: ${err.slice(0, 300)}`);
-        reject(new Error(`yt-dlp error: ${err.slice(0, 300)}`));
+        reject(new Error(err.trim().slice(0, 300)));
       }
     });
-
-    child.on('error', e => reject(new Error(`yt-dlp not found: ${e.message}`)));
+    child.on('error', e => reject(new Error(`spawn error: ${e.message}`)));
   });
+}
+
+async function getStreamUrl(videoId) {
+  if (streamCache.has(videoId)) return streamCache.get(videoId);
+
+  const ytUrl = `https://www.youtube.com/watch?v=${videoId}`;
+
+  // Base flags used in every attempt
+  const baseFlags = [
+    '-g',
+    '--no-warnings',
+    '--no-playlist',
+    '--socket-timeout', '15',
+    '--user-agent', USER_AGENT,
+    '--add-header', 'Accept-Language: en-US,en;q=0.9',
+  ];
+
+  if (COOKIES_FILE) {
+    baseFlags.push('--cookies', COOKIES_FILE);
+  }
+
+  // Attempt 1: audio-only, most common itags with broad fallback
+  // Attempt 2: accept ANY format (video+audio) — browser audio element handles it fine
+  const attempts = [
+    [...baseFlags, '-f', 'ba[ext=m4a]/ba[ext=webm]/ba/140/251/250/249/bestaudio', ytUrl],
+    [...baseFlags, '-f', 'b[ext=mp4]/b/bv+ba/worst', ytUrl],
+  ];
+
+  for (let i = 0; i < attempts.length; i++) {
+    try {
+      const url = await runYtDlp(attempts[i]);
+      console.log(`[Stream] Attempt ${i + 1} succeeded for ${videoId}`);
+      streamCache.set(videoId, url);
+      return url;
+    } catch (e) {
+      console.warn(`[Stream] Attempt ${i + 1} failed for ${videoId}: ${e.message.slice(0, 150)}`);
+    }
+  }
+
+  throw new Error(`All streaming attempts failed for ${videoId}. Video may be unavailable or geo-blocked.`);
 }
 
 app.get('/api/stream/:videoId', async (req, res) => {
