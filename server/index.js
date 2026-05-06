@@ -645,7 +645,12 @@ app.get('/api/charts', async (req, res) => {
 // ─── Streaming ────────────────────────────────────────────────────────────────
 const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
 
-async function runYtDlp(args) {
+async function runYtDlp(args, videoId) {
+  // Debug: Check if cookies file actually exists right before the call
+  if (COOKIES_FILE && !existsSync(COOKIES_FILE)) {
+    console.error(`[Cookies] CRITICAL: Cookies file missing at ${COOKIES_FILE}`);
+  }
+
   return new Promise((resolve, reject) => {
     const child = spawn('yt-dlp', args);
     let out = '', err = '';
@@ -657,7 +662,7 @@ async function runYtDlp(args) {
         if (url) resolve(url);
         else reject(new Error('Empty output'));
       } else {
-        reject(new Error(err.trim().slice(0, 300)));
+        reject(new Error(err.trim().slice(0, 500)));
       }
     });
     child.on('error', e => reject(new Error(`spawn error: ${e.message}`)));
@@ -669,7 +674,6 @@ async function getStreamUrl(videoId) {
 
   const ytUrl = `https://www.youtube.com/watch?v=${videoId}`;
 
-  // Base flags used in every attempt
   const baseFlags = [
     '-g',
     '--no-warnings',
@@ -679,29 +683,34 @@ async function getStreamUrl(videoId) {
     '--add-header', 'Accept-Language: en-US,en;q=0.9',
   ];
 
-  if (COOKIES_FILE) {
+  if (COOKIES_FILE && existsSync(COOKIES_FILE)) {
     baseFlags.push('--cookies', COOKIES_FILE);
+  } else if (process.env.YOUTUBE_COOKIES) {
+    console.error('[Cookies] COOKIES_FILE variable is set but file is missing on disk!');
   }
 
-  // Attempt 1: audio-only, most common itags with broad fallback
-  // Attempt 2: accept ANY format (video+audio) — browser audio element handles it fine
+  // 1. Standard Audio (Web/iOS spoof)
+  // 2. Aggressive (Android spoof)
+  // 3. Absolute Fallback (Any format)
   const attempts = [
-    [...baseFlags, '-f', 'ba[ext=m4a]/ba[ext=webm]/ba/140/251/250/249/bestaudio', ytUrl],
-    [...baseFlags, '-f', 'b[ext=mp4]/b/bv+ba/worst', ytUrl],
+    [...baseFlags, '-f', 'ba[ext=m4a]/ba[ext=webm]/ba/140/251/bestaudio', '--extractor-args', 'youtube:player_client=ios,web', ytUrl],
+    [...baseFlags, '-f', 'ba/best', '--extractor-args', 'youtube:player_client=android', ytUrl],
+    [...baseFlags, '-f', 'b/worst', ytUrl],
   ];
 
   for (let i = 0; i < attempts.length; i++) {
     try {
-      const url = await runYtDlp(attempts[i]);
+      const url = await runYtDlp(attempts[i], videoId);
       console.log(`[Stream] Attempt ${i + 1} succeeded for ${videoId}`);
       streamCache.set(videoId, url);
       return url;
     } catch (e) {
-      console.warn(`[Stream] Attempt ${i + 1} failed for ${videoId}: ${e.message.slice(0, 150)}`);
+      const isBot = e.message.includes('confirm you’re not a bot') || e.message.includes('Sign in');
+      console.warn(`[Stream] Attempt ${i + 1} failed for ${videoId}: ${isBot ? 'BOT DETECTION' : e.message.slice(0, 100)}`);
     }
   }
 
-  throw new Error(`All streaming attempts failed for ${videoId}. Video may be unavailable or geo-blocked.`);
+  throw new Error(`YouTube is blocking this request. Please ensure your YOUTUBE_COOKIES are fresh and in Netscape format.`);
 }
 
 app.get('/api/stream/:videoId', async (req, res) => {
