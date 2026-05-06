@@ -84,21 +84,9 @@ const SetupProfile = ({ userId, onComplete }) => {
           </div>
         </div>
 
-        <button type="button" onClick={handleApply} disabled={loading} className="button-primary auth-wide-button">
+        <button type="button" onClick={() => handleApply()} disabled={loading} className="button-primary auth-wide-button">
           {loading ? <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} /> : <ArrowRight size={16} />}
           {loading ? 'Saving profile...' : 'Confirm identity'}
-        </button>
-
-        <button
-          type="button"
-          className="button-secondary"
-          onClick={() => {
-            const generated = `user_${Math.floor(Math.random() * 1000)}`;
-            setUsername(generated);
-            handleApply(generated);
-          }}
-        >
-          Skip for now
         </button>
       </div>
     </div>
