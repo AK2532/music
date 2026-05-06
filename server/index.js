@@ -1,9 +1,9 @@
 import express from 'express';
 import cors from 'cors';
 import YTMusic from 'ytmusic-api';
-import { spawn } from 'child_process';
 import axios from 'axios';
 import { LRUCache } from 'lru-cache';
+import ytDlp from 'yt-dlp-exec';
 
 const app = express();
 app.use(cors());
@@ -620,25 +620,24 @@ const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36
 
 async function getStreamUrl(videoId) {
   if (streamCache.has(videoId)) return streamCache.get(videoId);
-  return new Promise((resolve, reject) => {
-    const child = spawn('python', ['-m', 'yt_dlp', '-g', '-f', 'bestaudio/best', '--no-warnings', '--user-agent', USER_AGENT, `https://www.youtube.com/watch?v=${videoId}`]);
-    let out = '', err = '';
-    child.stdout.on('data', d => out += d.toString());
-    child.stderr.on('data', d => err += d.toString());
-    child.on('close', code => {
-      if (code === 0) {
-        const url = out.trim().split('\n')[0].trim();
-        if (url) { streamCache.set(videoId, url); resolve(url); }
-        else {
-          console.error(`[Stream] No URL found in yt-dlp output for ${videoId}`);
-          reject(new Error('No URL'));
-        }
-      } else {
-        console.error(`[Stream] yt-dlp failed for ${videoId} with code ${code}. Error: ${err}`);
-        reject(new Error(`yt-dlp error: ${err}`));
-      }
+  try {
+    const output = await ytDlp(`https://www.youtube.com/watch?v=${videoId}`, {
+      dumpSingleUrl: true,
+      format: 'bestaudio/best',
+      noWarnings: true,
+      userAgent: USER_AGENT,
     });
-  });
+    
+    const url = typeof output === 'string' ? output.trim() : output;
+    if (url) {
+      streamCache.set(videoId, url);
+      return url;
+    }
+    throw new Error('No URL found in yt-dlp output');
+  } catch (error) {
+    console.error(`[Stream] yt-dlp failed for ${videoId}:`, error.message);
+    throw new Error(`yt-dlp error: ${error.message}`);
+  }
 }
 
 app.get('/api/stream/:videoId', async (req, res) => {
