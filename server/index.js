@@ -103,7 +103,7 @@ function pickThumbnail(item) {
   // PRIORITY: If it's a song/video, use the high-res YouTube poster directly.
   // This is much more reliable than googleusercontent URLs which often 403.
   if (videoId && videoId.length === 11) {
-    return `https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg`;
+    return `https://i.ytimg.com/vi/${videoId}/hq720.jpg`;
   }
 
   if (url) {
