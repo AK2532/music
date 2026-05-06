@@ -15,6 +15,7 @@
     "cors": "^2.8.6",
     "express": "^5.2.1",
     "lru-cache": "^11.3.5",
+    "play-dl": "^1.9.7",
     "youtubei.js": "^17.0.1",
     "yt-dlp-exec": "^1.0.2",
     "ytmusic-api": "^5.3.1"
