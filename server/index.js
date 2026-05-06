@@ -32,10 +32,12 @@ let COOKIES_FILE = null;
 const rawCookies = process.env.YOUTUBE_COOKIES;
 if (rawCookies) {
   try {
+    // Clean the cookie string (remove accidental quotes or whitespace)
+    const cleanedCookies = rawCookies.trim().replace(/^["']|["']$/g, '');
     COOKIES_FILE = join(process.cwd(), 'yt_cookies.txt');
-    writeFileSync(COOKIES_FILE, rawCookies, 'utf-8');
-    const firstLine = rawCookies.split('\n')[0].slice(0, 50);
-    console.log(`[Cookies] Loaded from env. First line starts with: ${firstLine}`);
+    writeFileSync(COOKIES_FILE, cleanedCookies, 'utf-8');
+    const firstLine = cleanedCookies.split('\n')[0].slice(0, 50);
+    console.log(`[Cookies] Cleaned & Loaded. First line: ${firstLine}`);
   } catch (e) {
     console.warn('[Cookies] Failed to write cookies file:', e.message);
     COOKIES_FILE = null;
@@ -672,7 +674,8 @@ async function getStreamUrl(videoId) {
     '--no-warnings',
     '--no-playlist',
     '--ignore-config',
-    '--socket-timeout', '20',
+    '--no-check-certificates',
+    '--socket-timeout', '30',
     '--user-agent', USER_AGENT,
     '--add-header', 'Accept-Language: en-US,en;q=0.9',
   ];
@@ -681,11 +684,13 @@ async function getStreamUrl(videoId) {
     baseFlags.push('--cookies', COOKIES_FILE);
   }
 
-  // Fallback chain
+  // Multi-client fallback chain
   const attempts = [
-    { name: 'Standard (Cookies + iOS)', args: [...baseFlags, '-f', 'ba[ext=m4a]/ba/best', '--extractor-args', 'youtube:player_client=ios,web', ytUrl] },
-    { name: 'Aggressive (Web)', args: [...baseFlags, '-f', 'ba/best', '--extractor-args', 'youtube:player_client=web', ytUrl] },
-    { name: 'Last Resort (Any)', args: [...baseFlags, '-f', 'b/worst', ytUrl] }
+    { name: 'iOS/Web', args: [...baseFlags, '-f', 'ba[ext=m4a]/ba/best', '--extractor-args', 'youtube:player_client=ios,web', ytUrl] },
+    { name: 'Android', args: [...baseFlags, '-f', 'ba/best', '--extractor-args', 'youtube:player_client=android', ytUrl] },
+    { name: 'Mobile Web', args: [...baseFlags, '-f', 'ba/best', '--extractor-args', 'youtube:player_client=mweb', ytUrl] },
+    { name: 'Creator Client', args: [...baseFlags, '-f', 'ba/best', '--extractor-args', 'youtube:player_client=web_creator', ytUrl] },
+    { name: 'Emergency Fallback', args: [...baseFlags, '-f', 'b/worst', ytUrl] }
   ];
 
   let lastError = '';
@@ -699,6 +704,7 @@ async function getStreamUrl(videoId) {
       lastError = e.message;
       const isBot = e.message.includes('confirm you’re not a bot') || e.message.includes('Sign in');
       console.warn(`[Stream] ${attempt.name} failed: ${isBot ? 'BOT DETECTION' : e.message.slice(0, 100)}`);
+      if (e.message.includes('not available')) continue;
     }
   }
 
