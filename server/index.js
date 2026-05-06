@@ -626,6 +626,7 @@ async function getStreamUrl(videoId) {
       format: 'bestaudio/best',
       noWarnings: true,
       userAgent: USER_AGENT,
+      extractorArgs: 'youtube:player_client=android,web',
     });
     
     const url = typeof output === 'string' ? output.trim() : output;
