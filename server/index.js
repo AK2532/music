@@ -669,9 +669,23 @@ async function runYtDlp(args) {
 async function getStreamUrl(videoId) {
   if (streamCache.has(videoId)) return streamCache.get(videoId);
 
-  // ─── PRIMARY: play-dl (Built for Datacenter Bot Bypass) ───
+  // ─── PRIMARY: play-dl (With Cookie Integration) ───
   try {
     console.log(`[Stream] Attempting play-dl for ${videoId}...`);
+    
+    // Inject cookies into play-dl if available
+    if (rawCookies) {
+      try {
+        await play.setToken({
+          youtube: {
+            cookie: rawCookies
+          }
+        });
+      } catch (tokenErr) {
+        console.warn('[Stream] play-dl cookie injection failed:', tokenErr.message);
+      }
+    }
+
     const info = await play.video_info(videoId);
     const format = info.format.find(f => f.hasAudio && !f.hasVideo) || info.format[0];
     if (format?.url) {
@@ -680,11 +694,11 @@ async function getStreamUrl(videoId) {
       return format.url;
     }
   } catch (playErr) {
-    console.warn(`[Stream] play-dl failed: ${playErr.message}. Falling back to yt-dlp...`);
+    const isBot = playErr.message.includes('Sign in') || playErr.message.includes('bot');
+    console.warn(`[Stream] play-dl failed: ${isBot ? 'BOT DETECTION' : playErr.message.slice(0, 100)}`);
   }
 
-  // ─── SECONDARY: yt-dlp with Cookies & Client Spoofing ───
-  // Cookie Format Check
+  // ─── SECONDARY: yt-dlp fallback ───
   if (COOKIES_FILE && existsSync(COOKIES_FILE)) {
     try {
       const content = readFileSync(COOKIES_FILE, 'utf-8');
