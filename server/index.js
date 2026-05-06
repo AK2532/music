@@ -651,7 +651,7 @@ async function getStreamUrl(videoId) {
   return new Promise((resolve, reject) => {
     const args = [
       '-g',
-      '-f', 'bestaudio/best',
+      '-f', '140/251/250/249/bestaudio[acodec=mp4a]/bestaudio[acodec=opus]/bestaudio/best',
       '--no-warnings',
       '--user-agent', USER_AGENT,
       '--add-header', 'Accept-Language: en-US,en;q=0.9',
