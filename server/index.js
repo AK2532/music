@@ -475,55 +475,81 @@ app.get('/api/lyrics/:videoId', async (req, res) => {
     const cleanTitle = (title || '').replace(/\(.*\)|\[.*\]/g, '').trim();
     const cleanArtist = (artist || '').replace(/\(.*\)|\[.*\]/g, '').trim();
 
-    const searchQueries = [
-      { q: `${cleanTitle} ${cleanArtist}` },
-      { q: `${title} ${artist}` },
-      { q: title }
-    ];
-
-    for (const params of searchQueries) {
-      if (!params.q) continue;
+    if (cleanTitle && cleanArtist) {
       try {
-        const lrcRes = await axios.get('https://lrclib.net/api/search', { params, timeout: 4000 });
+        // 2a. Try exact match first (most reliable)
+        const getRes = await axios.get('https://lrclib.net/api/get', { 
+          params: { artist_name: cleanArtist, track_name: cleanTitle }, 
+          timeout: 4000 
+        });
+        
+        if (getRes.data && (getRes.data.syncedLyrics || getRes.data.plainLyrics)) {
+          const best = getRes.data;
+          console.log(`[Lyrics] Exact match on LRCLIB for ${cleanTitle}`);
+          return res.json(formatLrcResponse(best));
+        }
+      } catch (e) {
+        console.warn(`[Lyrics] LRCLIB exact get failed:`, e.message);
+      }
+
+      // 2b. Try search if exact failed, but with STRICTOR validation
+      try {
+        const lrcRes = await axios.get('https://lrclib.net/api/search', { 
+          params: { q: `${cleanTitle} ${cleanArtist}` }, 
+          timeout: 4000 
+        });
+        
         const results = lrcRes.data.filter(i => i.syncedLyrics || i.plainLyrics);
         if (results.length > 0) {
-          const scored = results.map(item => {
-            let score = 0;
-            const text = item.syncedLyrics || item.plainLyrics || '';
-            if (item.syncedLyrics) score += 10;
-            
-            // Prefer Romanized/ASCII text for wider readability
-            const asciiChars = (text.match(/[a-zA-Z]/g) || []).length;
-            const totalChars = text.replace(/\s+/g, '').length || 1;
-            if ((asciiChars / totalChars) > 0.4) score += 20;
-            
-            if (item.trackName?.toLowerCase() === cleanTitle.toLowerCase()) score += 5;
-            if (item.artistName?.toLowerCase().includes(cleanArtist.toLowerCase())) score += 5;
-            
-            return { item, score };
+          // Filter results for those that actually match our artist
+          const artistWords = cleanArtist.toLowerCase().split(/\s+/).filter(w => w.length > 2);
+          const filtered = results.filter(item => {
+            const resultArtist = (item.artistName || '').toLowerCase();
+            return artistWords.some(word => resultArtist.includes(word));
           });
-          
-          scored.sort((a, b) => b.score - a.score);
-          const best = scored[0].item;
-          console.log(`[Lyrics] Found on LRCLIB via query: ${params.q}`);
-          const synced = best.syncedLyrics;
-          if (synced) {
-            const lines = [];
-            synced.split('\n').forEach(line => {
-              const text = line.replace(/\[[^\]]+\]/g, '').trim();
-              const localRegex = /\[(\d+):(\d+(?:\.\d+)?)\]/g;
-              let match;
-              while ((match = localRegex.exec(line)) !== null) {
-                lines.push({ text, startTime: parseInt(match[1]) * 60 + parseFloat(match[2]), endTime: null });
-              }
+
+          if (filtered.length > 0) {
+            const scored = filtered.map(item => {
+              let score = 0;
+              const text = item.syncedLyrics || item.plainLyrics || '';
+              if (item.syncedLyrics) score += 10;
+              
+              // Prefer Romanized/ASCII text
+              const asciiChars = (text.match(/[a-zA-Z]/g) || []).length;
+              const totalChars = text.replace(/\s+/g, '').length || 1;
+              if ((asciiChars / totalChars) > 0.4) score += 20;
+              
+              if (item.trackName?.toLowerCase() === cleanTitle.toLowerCase()) score += 10;
+              
+              return { item, score };
             });
-            lines.sort((a, b) => a.startTime - b.startTime);
-            for (let i = 0; i < lines.length - 1; i++) lines[i].endTime = lines[i + 1].startTime;
-            return res.json({ provider: 'LRCLIB', source: 'LRCLIB', synced: true, text: synced, lines: lines.filter(l => l.text) });
+            
+            scored.sort((a, b) => b.score - a.score);
+            const best = scored[0].item;
+            console.log(`[Lyrics] Found on LRCLIB via search for ${cleanTitle}`);
+            return res.json(formatLrcResponse(best));
           }
-          return res.json({ provider: 'LRCLIB', source: 'LRCLIB', synced: false, text: best.plainLyrics || '', lines: [] });
         }
       } catch (_) { }
+    }
+
+    function formatLrcResponse(best) {
+      const synced = best.syncedLyrics;
+      if (synced) {
+        const lines = [];
+        synced.split('\n').forEach(line => {
+          const text = line.replace(/\[[^\]]+\]/g, '').trim();
+          const localRegex = /\[(\d+):(\d+(?:\.\d+)?)\]/g;
+          let match;
+          while ((match = localRegex.exec(line)) !== null) {
+            lines.push({ text, startTime: parseInt(match[1]) * 60 + parseFloat(match[2]), endTime: null });
+          }
+        });
+        lines.sort((a, b) => a.startTime - b.startTime);
+        for (let i = 0; i < lines.length - 1; i++) lines[i].endTime = lines[i + 1].startTime;
+        return { provider: 'LRCLIB', source: 'LRCLIB', synced: true, text: synced, lines: lines.filter(l => l.text) };
+      }
+      return { provider: 'LRCLIB', source: 'LRCLIB', synced: false, text: best.plainLyrics || '', lines: [] };
     }
 
     // 3. Try lyrics.ovh
