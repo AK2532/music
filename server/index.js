@@ -1,9 +1,9 @@
 import express from 'express';
 import cors from 'cors';
 import YTMusic from 'ytmusic-api';
+import { spawn } from 'child_process';
 import axios from 'axios';
 import { LRUCache } from 'lru-cache';
-import ytDlp from 'yt-dlp-exec';
 
 const app = express();
 app.use(cors());
@@ -620,25 +620,41 @@ const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36
 
 async function getStreamUrl(videoId) {
   if (streamCache.has(videoId)) return streamCache.get(videoId);
-  try {
-    const output = await ytDlp(`https://www.youtube.com/watch?v=${videoId}`, {
-      getUrl: true,
-      format: 'bestaudio/best',
-      noWarnings: true,
-      userAgent: USER_AGENT,
-      extractorArgs: 'youtube:player_client=android,web',
-    });
+  return new Promise((resolve, reject) => {
+    // Using system 'yt-dlp' installed via pip in postinstall
+    const child = spawn('yt-dlp', [
+      '-g', 
+      '-f', 'bestaudio/best', 
+      '--no-warnings', 
+      '--user-agent', USER_AGENT,
+      '--extractor-args', 'youtube:player_client=android,web',
+      `https://www.youtube.com/watch?v=${videoId}`
+    ]);
     
-    const url = typeof output === 'string' ? output.trim() : output;
-    if (url) {
-      streamCache.set(videoId, url);
-      return url;
-    }
-    throw new Error('No URL found in yt-dlp output');
-  } catch (error) {
-    console.error(`[Stream] yt-dlp failed for ${videoId}:`, error.message);
-    throw new Error(`yt-dlp error: ${error.message}`);
-  }
+    let out = '', err = '';
+    child.stdout.on('data', d => out += d.toString());
+    child.stderr.on('data', d => err += d.toString());
+    
+    child.on('close', code => {
+      if (code === 0) {
+        const url = out.trim().split('\n')[0].trim();
+        if (url) {
+          streamCache.set(videoId, url);
+          resolve(url);
+        } else {
+          reject(new Error('No URL found in output'));
+        }
+      } else {
+        console.error(`[Stream] yt-dlp failed for ${videoId}: ${err}`);
+        reject(new Error(`yt-dlp error: ${err}`));
+      }
+    });
+
+    child.on('error', (err) => {
+      console.error(`[Stream] Failed to spawn yt-dlp: ${err.message}`);
+      reject(new Error(`yt-dlp spawn error: ${err.message}`));
+    });
+  });
 }
 
 app.get('/api/stream/:videoId', async (req, res) => {
