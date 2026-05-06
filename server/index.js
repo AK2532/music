@@ -7,6 +7,7 @@ import { tmpdir } from 'os';
 import { join } from 'path';
 import axios from 'axios';
 import { LRUCache } from 'lru-cache';
+import play from 'play-dl';
 
 const app = express();
 app.use(cors({
@@ -668,7 +669,22 @@ async function runYtDlp(args) {
 async function getStreamUrl(videoId) {
   if (streamCache.has(videoId)) return streamCache.get(videoId);
 
-  // ─── Cookie Format Check ───
+  // ─── PRIMARY: play-dl (Built for Datacenter Bot Bypass) ───
+  try {
+    console.log(`[Stream] Attempting play-dl for ${videoId}...`);
+    const info = await play.video_info(videoId);
+    const format = info.format.find(f => f.hasAudio && !f.hasVideo) || info.format[0];
+    if (format?.url) {
+      console.log(`[Stream] play-dl SUCCEEDED for ${videoId}`);
+      streamCache.set(videoId, format.url);
+      return format.url;
+    }
+  } catch (playErr) {
+    console.warn(`[Stream] play-dl failed: ${playErr.message}. Falling back to yt-dlp...`);
+  }
+
+  // ─── SECONDARY: yt-dlp with Cookies & Client Spoofing ───
+  // Cookie Format Check
   if (COOKIES_FILE && existsSync(COOKIES_FILE)) {
     try {
       const content = readFileSync(COOKIES_FILE, 'utf-8');
@@ -696,7 +712,6 @@ async function getStreamUrl(videoId) {
     baseFlags.push('--cookies', COOKIES_FILE);
   }
 
-  // Multi-client fallback chain — TV is historically most reliable for data centers
   const attempts = [
     { name: 'TV Client', args: [...baseFlags, '-f', 'ba/best', '--extractor-args', 'youtube:player_client=tvhtml5', ytUrl] },
     { name: 'iOS/Web', args: [...baseFlags, '-f', 'ba[ext=m4a]/ba/best', '--extractor-args', 'youtube:player_client=ios,web', ytUrl] },
@@ -717,26 +732,6 @@ async function getStreamUrl(videoId) {
       console.warn(`[Stream] ${attempt.name} failed: ${isBot ? 'BOT DETECTION' : e.message.slice(0, 80)}`);
       if (e.message.includes('not available')) continue;
     }
-  }
-
-  // ─── FINAL FALLBACK: Public Invidious API ───
-  try {
-    console.log(`[Stream] Attempting Public API fallback for ${videoId}...`);
-    // Using a cluster of public Invidious instances
-    const instances = ['invidious.v0l.me', 'y.com.sb', 'invidious.flokinet.to'];
-    for (const host of instances) {
-      try {
-        const invRes = await axios.get(`https://${host}/api/v1/videos/${videoId}`, { timeout: 8000 });
-        const best = invRes.data?.adaptiveFormats?.filter(f => f.type?.includes('audio/'))?.[0];
-        if (best?.url) {
-          console.log(`[Stream] Public API (${host}) SUCCEEDED for ${videoId}`);
-          streamCache.set(videoId, best.url);
-          return best.url;
-        }
-      } catch (hErr) { continue; }
-    }
-  } catch (invErr) {
-    console.error(`[Stream] Public API fallback failed: ${invErr.message}`);
   }
 
   throw new Error(`YouTube Blocked: ${lastError.slice(0, 150)}`);
