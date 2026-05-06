@@ -622,7 +622,7 @@ async function getStreamUrl(videoId) {
   if (streamCache.has(videoId)) return streamCache.get(videoId);
   try {
     const output = await ytDlp(`https://www.youtube.com/watch?v=${videoId}`, {
-      dumpSingleUrl: true,
+      getUrl: true,
       format: 'bestaudio/best',
       noWarnings: true,
       userAgent: USER_AGENT,
