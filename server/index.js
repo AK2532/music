@@ -6,7 +6,13 @@ import axios from 'axios';
 import { LRUCache } from 'lru-cache';
 
 const app = express();
-app.use(cors());
+app.use(cors({
+  origin: '*',
+  methods: ['GET', 'HEAD', 'OPTIONS'],
+  allowedHeaders: ['Range', 'Content-Type', 'Authorization'],
+  exposedHeaders: ['Content-Length', 'Content-Range', 'Accept-Ranges', 'Content-Type'],
+  credentials: false,
+}));
 app.use(express.json());
 
 // Logger middleware
@@ -615,58 +621,40 @@ app.get('/api/charts', async (req, res) => {
   }
 });
 
-// Stream / Download
+// Stream / Download — yt-dlp installed via pip in build (see render.yaml)
 const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
 
 async function getStreamUrl(videoId) {
   if (streamCache.has(videoId)) return streamCache.get(videoId);
 
-  const clients = [
-    { name: 'ios', ua: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Mobile/15E148 Safari/604.1' },
-    { name: 'web_embedded', ua: USER_AGENT },
-    { name: 'android', ua: 'com.google.android.youtube/19.29.37 (Linux; U; Android 14; en_US) gzip' }
-  ];
+  return new Promise((resolve, reject) => {
+    const child = spawn('yt-dlp', [
+      '-g',
+      '-f', 'bestaudio[ext=webm]/bestaudio/best',
+      '--no-warnings',
+      '--user-agent', USER_AGENT,
+      '--extractor-args', 'youtube:player_client=ios',
+      '--add-header', 'Accept-Language: en-US,en;q=0.9',
+      `https://www.youtube.com/watch?v=${videoId}`
+    ]);
 
-  for (const client of clients) {
-    try {
-      const url = await new Promise((resolve, reject) => {
-        const child = spawn('yt-dlp', [
-          '-g', 
-          '-f', 'bestaudio/best', 
-          '--no-warnings', 
-          '--user-agent', client.ua,
-          '--extractor-args', `youtube:player_client=${client.name}`,
-          '--add-header', 'Accept-Language: en-US,en;q=0.9',
-          `https://www.youtube.com/watch?v=${videoId}`
-        ]);
-        
-        let out = '', err = '';
-        child.stdout.on('data', d => out += d.toString());
-        child.stderr.on('data', d => err += d.toString());
-        
-        child.on('close', code => {
-          if (code === 0) {
-            const result = out.trim().split('\n')[0].trim();
-            if (result) resolve(result);
-            else reject(new Error('No URL in output'));
-          } else {
-            reject(new Error(err || `Exit code ${code}`));
-          }
-        });
+    let out = '', err = '';
+    child.stdout.on('data', d => out += d.toString());
+    child.stderr.on('data', d => err += d.toString());
 
-        child.on('error', (err) => reject(new Error(`Spawn error: ${err.message}`)));
-      });
-
-      if (url) {
-        streamCache.set(videoId, url);
-        return url;
+    child.on('close', code => {
+      if (code === 0) {
+        const url = out.trim().split('\n')[0].trim();
+        if (url) { streamCache.set(videoId, url); resolve(url); }
+        else reject(new Error('No URL in yt-dlp output'));
+      } else {
+        console.error(`[Stream] yt-dlp failed for ${videoId}: ${err.slice(0, 200)}`);
+        reject(new Error(`yt-dlp error: ${err.slice(0, 200)}`));
       }
-    } catch (e) {
-      console.warn(`[Stream] Client ${client.name} failed for ${videoId}: ${e.message}`);
-    }
-  }
+    });
 
-  throw new Error('All yt-dlp clients failed to bypass bot detection. YouTube is blocking this server IP.');
+    child.on('error', e => reject(new Error(`yt-dlp not found. Ensure it is installed via pip: ${e.message}`)));
+  });
 }
 
 app.get('/api/stream/:videoId', async (req, res) => {
