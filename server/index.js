@@ -2,7 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import YTMusic from 'ytmusic-api';
 import { spawn } from 'child_process';
-import { writeFileSync, existsSync } from 'fs';
+import { writeFileSync, readFileSync, existsSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import axios from 'axios';
@@ -668,6 +668,18 @@ async function runYtDlp(args) {
 async function getStreamUrl(videoId) {
   if (streamCache.has(videoId)) return streamCache.get(videoId);
 
+  // ─── Cookie Format Check ───
+  if (COOKIES_FILE && existsSync(COOKIES_FILE)) {
+    try {
+      const content = readFileSync(COOKIES_FILE, 'utf-8');
+      if (!content.includes('# Netscape')) {
+        console.error('[Cookies] WARNING: Your YOUTUBE_COOKIES does not look like a Netscape file. It must start with "# Netscape"!');
+      }
+    } catch (e) {
+      console.warn('[Cookies] Failed to verify cookie format:', e.message);
+    }
+  }
+
   const ytUrl = `https://www.youtube.com/watch?v=${videoId}`;
   const baseFlags = [
     '-g',
@@ -684,13 +696,12 @@ async function getStreamUrl(videoId) {
     baseFlags.push('--cookies', COOKIES_FILE);
   }
 
-  // Multi-client fallback chain
+  // Multi-client fallback chain — TV is historically most reliable for data centers
   const attempts = [
+    { name: 'TV Client', args: [...baseFlags, '-f', 'ba/best', '--extractor-args', 'youtube:player_client=tvhtml5', ytUrl] },
     { name: 'iOS/Web', args: [...baseFlags, '-f', 'ba[ext=m4a]/ba/best', '--extractor-args', 'youtube:player_client=ios,web', ytUrl] },
     { name: 'Android', args: [...baseFlags, '-f', 'ba/best', '--extractor-args', 'youtube:player_client=android', ytUrl] },
-    { name: 'Mobile Web', args: [...baseFlags, '-f', 'ba/best', '--extractor-args', 'youtube:player_client=mweb', ytUrl] },
-    { name: 'Creator Client', args: [...baseFlags, '-f', 'ba/best', '--extractor-args', 'youtube:player_client=web_creator', ytUrl] },
-    { name: 'Emergency Fallback', args: [...baseFlags, '-f', 'b/worst', ytUrl] }
+    { name: 'Emergency', args: [...baseFlags, '-f', 'b/worst', ytUrl] }
   ];
 
   let lastError = '';
@@ -703,12 +714,32 @@ async function getStreamUrl(videoId) {
     } catch (e) {
       lastError = e.message;
       const isBot = e.message.includes('confirm you’re not a bot') || e.message.includes('Sign in');
-      console.warn(`[Stream] ${attempt.name} failed: ${isBot ? 'BOT DETECTION' : e.message.slice(0, 100)}`);
+      console.warn(`[Stream] ${attempt.name} failed: ${isBot ? 'BOT DETECTION' : e.message.slice(0, 80)}`);
       if (e.message.includes('not available')) continue;
     }
   }
 
-  throw new Error(`YouTube Blocked: ${lastError.slice(0, 200)}`);
+  // ─── FINAL FALLBACK: Public Invidious API ───
+  try {
+    console.log(`[Stream] Attempting Public API fallback for ${videoId}...`);
+    // Using a cluster of public Invidious instances
+    const instances = ['invidious.v0l.me', 'y.com.sb', 'invidious.flokinet.to'];
+    for (const host of instances) {
+      try {
+        const invRes = await axios.get(`https://${host}/api/v1/videos/${videoId}`, { timeout: 8000 });
+        const best = invRes.data?.adaptiveFormats?.filter(f => f.type?.includes('audio/'))?.[0];
+        if (best?.url) {
+          console.log(`[Stream] Public API (${host}) SUCCEEDED for ${videoId}`);
+          streamCache.set(videoId, best.url);
+          return best.url;
+        }
+      } catch (hErr) { continue; }
+    }
+  } catch (invErr) {
+    console.error(`[Stream] Public API fallback failed: ${invErr.message}`);
+  }
+
+  throw new Error(`YouTube Blocked: ${lastError.slice(0, 150)}`);
 }
 
 app.get('/api/stream/:videoId', async (req, res) => {
