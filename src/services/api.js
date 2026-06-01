@@ -458,8 +458,21 @@ export const musicService = {
       return streamResolver.getStreamUrl(videoId, quality);
     }
 
-    // Backend mode returns a same-origin/API audio endpoint, not a googlevideo URL.
-    // That keeps YouTube's IP-bound CDN URL on the server that resolved it.
+    // In backend mode, fetch the resolved direct CDN audio URL from the server.
+    // This allows the browser/app to play directly from googlevideo.com without proxy bottlenecks.
+    try {
+      const response = await fetch(`${API_BASE}/stream/${encodeURIComponent(videoId)}?quality=${encodeURIComponent(quality)}`);
+      if (response.ok) {
+        const data = await response.json();
+        if (data && data.url) {
+          return data.url;
+        }
+      }
+    } catch (err) {
+      console.warn('[API] Failed to fetch resolved stream from backend, falling back to local proxy endpoint:', err);
+    }
+
+    // Fallback to Express proxied stream if direct URL lookup fails
     return `${API_BASE}/audio/${encodeURIComponent(videoId)}?quality=${encodeURIComponent(quality)}&t=${Date.now()}`;
   },
 
