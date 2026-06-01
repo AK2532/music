@@ -34,7 +34,17 @@ async function performRequest(url, options = {}) {
     return {
       ok: response.status >= 200 && response.status < 300,
       status: response.status,
-      json: async () => response.data,
+      json: async () => {
+        if (typeof response.data === 'string') {
+          try {
+            return JSON.parse(response.data);
+          } catch (e) {
+            console.error('[streamResolver] JSON parse failed:', e);
+            return response.data;
+          }
+        }
+        return response.data;
+      },
       text: async () => typeof response.data === 'string' ? response.data : JSON.stringify(response.data)
     };
   } else {
