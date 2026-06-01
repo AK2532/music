@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useRef } from 'react';
+import { Capacitor } from '@capacitor/core';
 import { musicService } from '../services/api';
 import { usePlayerStore } from '../stores/playerStore';
+
+const IS_NATIVE = Capacitor.isNativePlatform();
 
 const analyserCache = new WeakMap();
 
@@ -73,6 +76,8 @@ export function useAudioEngine() {
   const loadingTimeoutRef = useRef(null);
   const sponsorSegmentsRef = useRef([]);
   const isNewSongLoadingRef = useRef(false);
+  const loadAbortRef = useRef(null);   // AbortController for in-flight stream resolution
+  const loadingSongIdRef = useRef(null); // Tracks which song triggered the current load
   const consecutiveErrorsRef = useRef(0);
   const stateRef = useRef({
     isPlaying: false,
@@ -100,7 +105,12 @@ export function useAudioEngine() {
   if (audioRef.current == null) {
     const element = new Audio();
     element.preload = 'auto';
-    element.crossOrigin = 'anonymous'; // Restored to securely allow the visualizer to read local backend streams
+    // On native mobile, crossOrigin='anonymous' causes the CDN to reject the
+    // audio stream with 403 (CORS headers confuse Google's origin-locked CDN URLs).
+    // The audio analyser is also not useful inside a Capacitor WebView.
+    if (!IS_NATIVE) {
+      element.crossOrigin = 'anonymous'; // Allows the Web Audio API visualizer to work on desktop
+    }
     audioRef.current = element;
   }
 
@@ -142,6 +152,14 @@ export function useAudioEngine() {
     const audio = audioRef.current;
     if (!currentSong) return undefined;
 
+    // ── Abort any in-flight stream resolution for the PREVIOUS song ───────────
+    if (loadAbortRef.current) {
+      loadAbortRef.current.aborted = true; // Mark old controller as aborted
+    }
+    const abortController = { aborted: false };
+    loadAbortRef.current = abortController;
+    loadingSongIdRef.current = currentSong.id;
+
     fallbackTriedRef.current = false;
     clearTimeout(loadingTimeoutRef.current);
 
@@ -164,10 +182,23 @@ export function useAudioEngine() {
       }
 
       isNewSongLoadingRef.current = true;
-      const srcResult = musicService.getStreamUrl(currentSong.id, stateRef.current.audioQuality);
+      const thisSongId = currentSong.id;
+      const srcResult = musicService.getStreamUrl(thisSongId, stateRef.current.audioQuality);
       
       Promise.resolve(srcResult).then((nextSrc) => {
-        if (!nextSrc) return;
+        // Guard: if this load was superseded by a newer song, discard the result
+        if (abortController.aborted || loadingSongIdRef.current !== thisSongId) {
+          console.log(`[AudioEngine] Discarding stale stream for ${thisSongId} (new song already loading)`);
+          return;
+        }
+
+        if (!nextSrc) {
+          console.error(`[AudioEngine] No stream URL returned for ${thisSongId}`);
+          isNewSongLoadingRef.current = false;
+          setLoading(false);
+          setPlaying(false);
+          return;
+        }
         
         if (audio.src !== nextSrc) {
           audio.src = nextSrc;
@@ -186,16 +217,22 @@ export function useAudioEngine() {
           isNewSongLoadingRef.current = false;
         }
       }).catch((err) => {
+        // Guard: don't act on stale resolutions
+        if (abortController.aborted || loadingSongIdRef.current !== thisSongId) return;
+
         console.error("[AudioEngine] Stream resolution failed:", err);
         isNewSongLoadingRef.current = false;
         setLoading(false);
         setPlaying(false);
-        // Force the audio player's error listener to trigger and skip to the next track
-        setTimeout(() => playNext(), 2000);
+        // Do NOT auto-skip here — let the audio error handler deal with it
+        // to avoid double-skipping if the audio element also fires an error event
       });
 
+      // Safety timeout: only fire playNext if THIS exact song is still loading
       loadingTimeoutRef.current = setTimeout(() => {
+        if (abortController.aborted || loadingSongIdRef.current !== thisSongId) return;
         if (!audio.duration) {
+          console.warn(`[AudioEngine] Load timeout for ${thisSongId}. Skipping.`);
           setLoading(false);
           setPlaying(false);
           playNext();
@@ -307,6 +344,13 @@ export function useAudioEngine() {
     };
 
     const onError = () => {
+      // MEDIA_ERR_ABORTED (code 1) means the audio element was intentionally interrupted
+      // because the src was changed to a new song. This is NOT a real error — ignore it.
+      if (audio.error?.code === 1) {
+        console.log('[AudioEngine] Audio source changed (MEDIA_ERR_ABORTED) — not a real error, ignoring.');
+        return;
+      }
+
       clearTimeout(loadingTimeoutRef.current);
       setLoading(false);
       setPlaying(false);
