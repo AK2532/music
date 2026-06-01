@@ -155,6 +155,7 @@ export const streamResolver = {
     // WEB_REMIX (c=WEB) and IOS_MUSIC (c=IOS) produce session-bound URLs that 403.
     // TVHTML5 and ANDROID_* produce c=TVHTML5/c=ANDROID URLs that play without cookies.
     const clients = [
+      { name: 'ANDROID_TESTSUITE', clientName: 'ANDROID_TESTSUITE', clientVersion: '1.9'              },
       { name: 'TVHTML5',           clientName: 'TVHTML5',           clientVersion: '7.20230405.01.00' },
       { name: 'ANDROID_MUSIC',     clientName: 'ANDROID_MUSIC',     clientVersion: '6.42.52'          },
       { name: 'ANDROID_EMBEDDED',  clientName: 'ANDROID_EMBEDDED',  clientVersion: '19.13.36'         },

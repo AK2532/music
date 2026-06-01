@@ -715,6 +715,7 @@ async function runYtDlp(args) {
 //   IOS_MUSIC   → c=IOS URLs that require Apple-signed session headers → 403
 const INNERTUBE_KEY = 'AIzaSyAO_J29T0vS8Gg6wW6_8k';
 const INNERTUBE_CLIENTS = [
+  { name: 'ANDROID_TESTSUITE', clientName: 'ANDROID_TESTSUITE', clientVersion: '1.9'              },
   { name: 'TVHTML5',           clientName: 'TVHTML5',           clientVersion: '7.20230405.01.00' },
   { name: 'ANDROID_MUSIC',     clientName: 'ANDROID_MUSIC',     clientVersion: '6.42.52'          },
   { name: 'ANDROID_EMBEDDED',  clientName: 'ANDROID_EMBEDDED',  clientVersion: '19.13.36'         },
