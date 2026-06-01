@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { youtubeClient } from './youtubeClient';
 import { streamResolver } from './streamResolver';
+import { Capacitor } from '@capacitor/core';
 
 const API_BASE = import.meta.env.VITE_API_BASE || '/api';
 
@@ -9,12 +10,12 @@ const api = axios.create({
   timeout: 30000, // 30 seconds timeout
 });
 
-// Environment detection
-const isCapacitor = typeof window !== 'undefined' && !!window.Capacitor;
-let useClientSide = isCapacitor;
+// Environment detection (only true on native Android/iOS app containers)
+const isCapacitor = Capacitor.isNativePlatform();
+const useClientSide = isCapacitor;
 window.__backendAvailable = !isCapacitor;
 
-// Check backend status if not running inside Capacitor
+// Check backend status if not running inside Capacitor (for visual logging only)
 if (!isCapacitor) {
   fetch(`${API_BASE}/health`)
     .then(r => r.json())
@@ -22,17 +23,14 @@ if (!isCapacitor) {
       if (data?.status === 'ok') {
         console.log('[API] Local backend server detected. Running in Proxy mode.');
         window.__backendAvailable = true;
-        useClientSide = false;
       } else {
-        console.warn('[API] Backend server returned unhealthy response. Switching to Client-Side mode.');
+        console.warn('[API] Local backend server is offline or returned unhealthy status.');
         window.__backendAvailable = false;
-        useClientSide = true;
       }
     })
     .catch(() => {
-      console.warn('[API] Backend server offline. Switching to Client-Side mode.');
+      console.warn('[API] Local backend server is offline. Please make sure "npm run dev" is running.');
       window.__backendAvailable = false;
-      useClientSide = true;
     });
 }
 

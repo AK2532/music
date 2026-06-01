@@ -530,12 +530,13 @@ let config = null;
 async function getClientConfig() {
   if (config) return config;
   try {
-    const res = await performRequest("https://music.youtube.com/", {
-      headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Accept-Language": "en-US,en;q=0.9",
-      }
-    });
+    const headers = {
+      "Accept-Language": "en-US,en;q=0.9",
+    };
+    if (typeof navigator !== 'undefined' && navigator.userAgent) {
+      headers["User-Agent"] = navigator.userAgent;
+    }
+    const res = await performRequest("https://music.youtube.com/", { headers });
     const html = await res.text();
     const setConfigs = html.match(/ytcfg\.set\(.*?\);/g) || [];
     let parsedConfig = {};
@@ -579,6 +580,9 @@ async function constructRequest(endpoint, body = {}, query = {}) {
     "X-YouTube-Client-Name": "67", // 67 corresponds to WEB_REMIX
     "X-YouTube-Client-Version": cfg.clientVersion,
   };
+  if (typeof navigator !== 'undefined' && navigator.userAgent) {
+    headers["User-Agent"] = navigator.userAgent;
+  }
   
   const searchParams = new URLSearchParams({
     ...query,

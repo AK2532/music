@@ -50,12 +50,8 @@ async function fetchPlayer(videoId, clientName, clientVersion) {
     "Content-Type": "application/json",
   };
   
-  if (clientName === "ANDROID_MUSIC") {
-    headers["User-Agent"] = "com.google.android.apps.youtube.music/6.02.52 (Linux; U; Android 11; en_US) gzip";
-  } else if (clientName === "TVHTML5") {
-    headers["User-Agent"] = "Mozilla/5.0 (Chromecast; Google TV) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36";
-  } else {
-    headers["User-Agent"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+  if (typeof navigator !== 'undefined' && navigator.userAgent) {
+    headers["User-Agent"] = navigator.userAgent;
   }
 
   const response = await performRequest(url, {
