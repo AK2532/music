@@ -299,6 +299,10 @@ const App = () => {
     initApp();
 
     const { data: authData } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (window.localStorage.getItem('dev_user') === 'true') {
+        return;
+      }
+
       const sessionUser = session?.user || null;
       
       // If logging out, clear everything
