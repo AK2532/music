@@ -651,14 +651,18 @@ async function runYtDlp(args) {
 }
 
 // ─── InnerTube Direct Resolver (PRIMARY — same approach as streamResolver.js on mobile) ─
-// Calls YouTube Music's internal player API directly. No yt-dlp or play-dl required.
-// This is the same method YouTube Music's own app uses internally.
+// Only clients that return freely playable CDN URLs (c=TVHTML5 / c=ANDROID_*):
+//   TVHTML5       → c=TVHTML5 URLs, no session required, no n-param transform needed
+//   ANDROID_MUSIC → c=ANDROID_MUSIC URLs, no session required
+//   ANDROID_EMBEDDED → c=ANDROID_EMBEDDED, reliable fallback
+// Excluded:
+//   WEB_REMIX   → c=WEB URLs that require active YouTube browser session cookies → 403
+//   IOS_MUSIC   → c=IOS URLs that require Apple-signed session headers → 403
 const INNERTUBE_KEY = 'AIzaSyAO_J29T0vS8Gg6wW6_8k';
 const INNERTUBE_CLIENTS = [
-  { name: 'TVHTML5',      clientName: 'TVHTML5',      clientVersion: '7.20230405.01.00' },
-  { name: 'ANDROID_MUSIC',clientName: 'ANDROID_MUSIC', clientVersion: '6.02.52'         },
-  { name: 'IOS_MUSIC',    clientName: 'IOS_MUSIC',     clientVersion: '6.21'            },
-  { name: 'WEB_REMIX',    clientName: 'WEB_REMIX',     clientVersion: '1.20241022.01.00' },
+  { name: 'TVHTML5',           clientName: 'TVHTML5',           clientVersion: '7.20230405.01.00' },
+  { name: 'ANDROID_MUSIC',     clientName: 'ANDROID_MUSIC',     clientVersion: '6.42.52'          },
+  { name: 'ANDROID_EMBEDDED',  clientName: 'ANDROID_EMBEDDED',  clientVersion: '19.13.36'         },
 ];
 
 async function innerTubeFetchPlayer(videoId, clientName, clientVersion) {
@@ -703,10 +707,10 @@ function extractAudioUrlFromPlayerData(data) {
       if (url) return url;
     }
   }
-  // Last resort: any format with a direct URL
-  for (const f of formats) {
-    if (f.url) return f.url;
-  }
+  // IMPORTANT: Do NOT fall back to video formats.
+  // Video-format URLs (itag=18, mime=video/mp4, c=WEB) require browser session cookies
+  // and will 403 when the audio element requests them directly.
+  // If no audio-only direct URL exists for this client, return null and try the next client.
   return null;
 }
 

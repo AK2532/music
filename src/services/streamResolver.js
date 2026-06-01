@@ -100,7 +100,7 @@ function extractAudioUrl(playerData) {
     }
   }
 
-  // 2. Try deciphering signature cipher if it's there (rare for TV/Android clients)
+  // 2. Try extracting URL from signatureCipher (rare for TV/Android clients)
   for (const format of audioFormats) {
     if (format.signatureCipher || format.cipher) {
       const cipher = format.signatureCipher || format.cipher;
@@ -110,7 +110,6 @@ function extractAudioUrl(playerData) {
       const sp = params.get("sp") || "sig";
       
       if (url) {
-        // If the signature doesn't need complex deciphering, or as a last-resort fallback
         if (sig) {
           return `${url}&${sp}=${encodeURIComponent(sig)}`;
         }
@@ -119,57 +118,59 @@ function extractAudioUrl(playerData) {
     }
   }
 
-  // 3. Fallback to any format with a direct URL (e.g. low quality video format)
-  for (const format of formats) {
-    if (format.url) {
-      return format.url;
-    }
-  }
-
+  // IMPORTANT: Do NOT fall back to video formats (itag=18, mime=video/mp4, c=WEB).
+  // Video-format CDN URLs require a browser session cookie — they always 403 when
+  // the audio element requests them directly without that session.
+  // Return null so the caller tries a different InnerTube client.
   return null;
 }
+
 
 export const streamResolver = {
   getStreamUrl: async (videoId, quality = "high") => {
     console.log(`[StreamResolver] Fetching direct stream URL for ${videoId}...`);
     
-    // 1. First attempt: TVHTML5 (most reliable for direct browser/webview playback, bypasses signature cipher)
+    // Only use clients that return freely playable CDN URLs.
+    // WEB_REMIX (c=WEB) and IOS_MUSIC (c=IOS) produce session-bound URLs that 403.
+    // TVHTML5 and ANDROID_* produce c=TVHTML5/c=ANDROID URLs that play without cookies.
+    
+    // 1. TVHTML5 (most reliable — TV clients get direct, non-ciphered audio URLs)
     try {
       const data = await fetchPlayer(videoId, "TVHTML5", "7.20230405.01.00");
       const url = extractAudioUrl(data);
       if (url) {
-        console.log(`[StreamResolver] Successfully resolved direct stream URL via TVHTML5 for ${videoId}`);
+        console.log(`[StreamResolver] TVHTML5 succeeded for ${videoId}`);
         return url;
       }
     } catch (e) {
-      console.warn(`[StreamResolver] TVHTML5 resolver failed:`, e.message);
+      console.warn(`[StreamResolver] TVHTML5 failed:`, e.message);
     }
 
-    // 2. Second attempt: ANDROID_MUSIC (fallback)
+    // 2. ANDROID_MUSIC (reliable fallback)
     try {
-      const data = await fetchPlayer(videoId, "ANDROID_MUSIC", "6.02.52");
+      const data = await fetchPlayer(videoId, "ANDROID_MUSIC", "6.42.52");
       const url = extractAudioUrl(data);
       if (url) {
-        console.log(`[StreamResolver] Successfully resolved direct stream URL via ANDROID_MUSIC for ${videoId}`);
+        console.log(`[StreamResolver] ANDROID_MUSIC succeeded for ${videoId}`);
         return url;
       }
     } catch (e) {
-      console.warn(`[StreamResolver] ANDROID_MUSIC resolver failed:`, e.message);
+      console.warn(`[StreamResolver] ANDROID_MUSIC failed:`, e.message);
     }
 
-    // 3. Third attempt: standard web player context
+    // 3. ANDROID_EMBEDDED (third option)
     try {
-      const data = await fetchPlayer(videoId, "WEB_REMIX", "1.20241022.01.00");
+      const data = await fetchPlayer(videoId, "ANDROID_EMBEDDED", "19.13.36");
       const url = extractAudioUrl(data);
       if (url) {
-        console.log(`[StreamResolver] Successfully resolved direct stream URL via WEB_REMIX for ${videoId}`);
+        console.log(`[StreamResolver] ANDROID_EMBEDDED succeeded for ${videoId}`);
         return url;
       }
     } catch (e) {
-      console.error(`[StreamResolver] WEB_REMIX resolver failed:`, e.message);
+      console.error(`[StreamResolver] ANDROID_EMBEDDED failed:`, e.message);
     }
 
-    // Return a last-resort fallback or throw
+    // All clients failed
     throw new Error(`Failed to extract audio stream for song ${videoId}`);
   }
 };
