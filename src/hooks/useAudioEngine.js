@@ -15,58 +15,11 @@ export const audioMetrics = {
 };
 
 export function getOrCreateAnalyser(audio) {
-  if (!audio) return null;
-  if (analyserCache.has(audio)) return analyserCache.get(audio);
-
-  try {
-    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-    const context = new AudioContextClass();
-    const source = context.createMediaElementSource(audio);
-    const analyser = context.createAnalyser();
-    analyser.fftSize = 512;
-    analyser.smoothingTimeConstant = 0.8;
-    source.connect(analyser);
-    analyser.connect(context.destination);
-
-    const data = new Uint8Array(analyser.frequencyBinCount);
-    const entry = {
-      ctx: context,
-      analyser,
-      data,
-    };
-    analyserCache.set(audio, entry);
-    
-    audioMetrics.raw = data;
-
-    const updateMetrics = () => {
-      if (!audio.paused) {
-        analyser.getByteFrequencyData(data);
-        
-        let bassSum = 0;
-        for (let i = 0; i < 10; i++) bassSum += data[i];
-        audioMetrics.bass = bassSum / 10 / 255;
-        
-        let midsSum = 0;
-        for (let i = 10; i < 100; i++) midsSum += data[i];
-        audioMetrics.mids = midsSum / 90 / 255;
-
-        let trebleSum = 0;
-        for (let i = 100; i < 200; i++) trebleSum += data[i];
-        audioMetrics.treble = trebleSum / 100 / 255;
-      } else {
-        audioMetrics.bass *= 0.95;
-        audioMetrics.mids *= 0.95;
-        audioMetrics.treble *= 0.95;
-      }
-      requestAnimationFrame(updateMetrics);
-    };
-    updateMetrics();
-
-    return entry;
-  } catch (e) {
-    console.warn("Analyser setup failed", e);
-    return null;
-  }
+  // Bypassed: YouTube CDN URLs (googlevideo.com) are cross-origin and do not send CORS headers.
+  // Connecting the audio element to Web Audio API via createMediaElementSource mutes/silences
+  // the playback entirely due to browser security restrictions. Returning null here
+  // allows the audio element to play natively through the system speakers with sound.
+  return null;
 }
 
 export function useAudioEngine() {

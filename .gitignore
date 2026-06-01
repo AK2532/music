@@ -9,6 +9,7 @@ lerna-debug.log*
 
 node_modules
 dist
+server/yt_cookies.txt
 dist-ssr
 *.local
 

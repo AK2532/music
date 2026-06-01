@@ -87,11 +87,15 @@ function extractAudioUrl(playerData) {
     ...(playerData.streamingData?.formats || [])
   ];
 
-  // Filter for audio-only streams (e.g., audio/mp4, audio/webm)
+  // Filter for audio-only streams and prefer M4A/MP4 for iOS Safari compatibility.
   const audioFormats = formats.filter(f => f.mimeType && f.mimeType.startsWith("audio/"));
   
-  // Sort by bitrate (highest quality first)
-  audioFormats.sort((a, b) => (b.bitrate || 0) - (a.bitrate || 0));
+  audioFormats.sort((a, b) => {
+    const aMp4 = a.mimeType?.includes("mp4") ? 1 : 0;
+    const bMp4 = b.mimeType?.includes("mp4") ? 1 : 0;
+    if (aMp4 !== bMp4) return bMp4 - aMp4;
+    return (b.bitrate || 0) - (a.bitrate || 0);
+  });
 
   // 1. Try to find a direct URL in audio formats
   for (const format of audioFormats) {

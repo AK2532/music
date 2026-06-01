@@ -30,6 +30,31 @@ const ytmusic = new YTMusic();
 await ytmusic.initialize();
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
+const ROOT_ENV_FILE = join(__dirname, '..', '.env');
+const SERVER_ENV_FILE = join(__dirname, '.env');
+const BUNDLED_YT_DLP = join(__dirname, 'node_modules', 'yt-dlp-exec', 'bin', process.platform === 'win32' ? 'yt-dlp.exe' : 'yt-dlp');
+
+function loadEnvFile(filePath) {
+  if (!existsSync(filePath)) return;
+  try {
+    const lines = readFileSync(filePath, 'utf-8').split(/\r?\n/);
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith('#')) continue;
+      const index = trimmed.indexOf('=');
+      if (index <= 0) continue;
+      const key = trimmed.slice(0, index).trim();
+      let value = trimmed.slice(index + 1).trim();
+      value = value.replace(/^["']|["']$/g, '');
+      if (!process.env[key]) process.env[key] = value;
+    }
+  } catch (e) {
+    console.warn(`[Env] Failed to load ${filePath}:`, e.message);
+  }
+}
+
+loadEnvFile(ROOT_ENV_FILE);
+loadEnvFile(SERVER_ENV_FILE);
 
 // ─── Cookie Setup ─────────────────────────────────────────────────────────────
 let COOKIES_FILE = null;
@@ -52,7 +77,7 @@ if (rawCookies) {
   console.warn('[Cookies] No YOUTUBE_COOKIES found in environment.');
 }
 
-const streamCache = new LRUCache({ max: 1000, ttl: 1000 * 60 * 60 * 4 }); // 4hr cache (URLs valid ~6hr)
+const streamCache = new LRUCache({ max: 1000, ttl: 1000 * 60 * 45 }); // CDN URLs are short-lived and client/IP scoped.
 const relatedCache = new LRUCache({ max: 500, ttl: 1000 * 60 * 30 });
 const homeCache = new LRUCache({ max: 20, ttl: 1000 * 30 });
 
@@ -633,7 +658,8 @@ const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36
 
 async function runYtDlp(args) {
   return new Promise((resolve, reject) => {
-    const child = spawn('yt-dlp', args);
+    const executable = existsSync(BUNDLED_YT_DLP) ? BUNDLED_YT_DLP : 'yt-dlp';
+    const child = spawn(executable, args);
     let out = '', err = '';
     child.stdout.on('data', d => out += d.toString());
     child.stderr.on('data', d => err += d.toString());
@@ -655,6 +681,7 @@ async function runYtDlp(args) {
 //   TVHTML5       → c=TVHTML5 URLs, no session required, no n-param transform needed
 //   ANDROID_MUSIC → c=ANDROID_MUSIC URLs, no session required
 //   ANDROID_EMBEDDED → c=ANDROID_EMBEDDED, reliable fallback
+//   ANDROID_VR    → often returns direct audio/webm when other Android clients omit formats
 // Excluded:
 //   WEB_REMIX   → c=WEB URLs that require active YouTube browser session cookies → 403
 //   IOS_MUSIC   → c=IOS URLs that require Apple-signed session headers → 403
@@ -663,6 +690,7 @@ const INNERTUBE_CLIENTS = [
   { name: 'TVHTML5',           clientName: 'TVHTML5',           clientVersion: '7.20230405.01.00' },
   { name: 'ANDROID_MUSIC',     clientName: 'ANDROID_MUSIC',     clientVersion: '6.42.52'          },
   { name: 'ANDROID_EMBEDDED',  clientName: 'ANDROID_EMBEDDED',  clientVersion: '19.13.36'         },
+  { name: 'ANDROID_VR',        clientName: 'ANDROID_VR',        clientVersion: '1.60.19'          },
 ];
 
 async function innerTubeFetchPlayer(videoId, clientName, clientVersion) {
@@ -693,10 +721,15 @@ function extractAudioUrlFromPlayerData(data) {
     ...(data.streamingData?.adaptiveFormats || []),
     ...(data.streamingData?.formats || []),
   ];
-  // Audio-only streams, highest bitrate first
+  // Prefer M4A/MP4 because iOS Safari does not reliably play WebM audio.
   const audioOnly = formats
     .filter(f => f.mimeType?.startsWith('audio/'))
-    .sort((a, b) => (b.bitrate || 0) - (a.bitrate || 0));
+    .sort((a, b) => {
+      const aMp4 = a.mimeType?.includes('mp4') ? 1 : 0;
+      const bMp4 = b.mimeType?.includes('mp4') ? 1 : 0;
+      if (aMp4 !== bMp4) return bMp4 - aMp4;
+      return (b.bitrate || 0) - (a.bitrate || 0);
+    });
 
   for (const f of audioOnly) {
     if (f.url) return f.url;
@@ -714,12 +747,31 @@ function extractAudioUrlFromPlayerData(data) {
   return null;
 }
 
+function isDirectAudioUrl(url) {
+  try {
+    const parsed = new URL(url);
+    const mime = parsed.searchParams.get('mime') || '';
+    const itag = parsed.searchParams.get('itag') || '';
+    return mime.startsWith('audio/') && itag !== '18';
+  } catch {
+    return false;
+  }
+}
+
+function assertDirectAudioUrl(url, source) {
+  if (!isDirectAudioUrl(url)) {
+    throw new Error(`${source} returned a non-audio stream URL`);
+  }
+  return url;
+}
+
 async function resolveViaInnerTube(videoId) {
   for (const client of INNERTUBE_CLIENTS) {
     try {
       const data = await innerTubeFetchPlayer(videoId, client.clientName, client.clientVersion);
       const url = extractAudioUrlFromPlayerData(data);
       if (url) {
+        assertDirectAudioUrl(url, `InnerTube/${client.name}`);
         console.log(`[Stream] InnerTube/${client.name} succeeded for ${videoId}`);
         return url;
       }
@@ -756,8 +808,17 @@ async function getStreamUrl(videoId) {
       }
     }
     const info = await play.video_info(videoId);
-    const format = info.format.find(f => f.hasAudio && !f.hasVideo) || info.format[0];
+    const audioFormats = info.format
+      .filter(f => f.hasAudio && !f.hasVideo)
+      .sort((a, b) => {
+        const aMp4 = String(a.mimeType || a.type || a.url || '').includes('mp4') ? 1 : 0;
+        const bMp4 = String(b.mimeType || b.type || b.url || '').includes('mp4') ? 1 : 0;
+        if (aMp4 !== bMp4) return bMp4 - aMp4;
+        return (b.bitrate || 0) - (a.bitrate || 0);
+      });
+    const format = audioFormats[0];
     if (format?.url) {
+      assertDirectAudioUrl(format.url, 'play-dl');
       console.log(`[Stream] play-dl SUCCEEDED for ${videoId}`);
       streamCache.set(videoId, format.url);
       return format.url;
@@ -780,17 +841,16 @@ async function getStreamUrl(videoId) {
   }
 
   const attempts = [
-    { name: 'TV Client',    args: [...baseFlags, '-f', 'ba/best', '--extractor-args', 'youtube:player_client=tvhtml5', ytUrl] },
-    { name: 'Android Music',args: [...baseFlags, '-f', 'ba/best', '--extractor-args', 'youtube:player_client=android_music', ytUrl] },
-    { name: 'iOS/Web',      args: [...baseFlags, '-f', 'ba[ext=m4a]/ba/best', '--extractor-args', 'youtube:player_client=ios,web', ytUrl] },
-    { name: 'IPv4 Fallback',args: [...baseFlags, '--force-ipv4', '-f', 'ba/best', ytUrl] },
-    { name: 'Emergency',    args: [...baseFlags, '-f', 'b/worst', ytUrl] }
+    { name: 'TV Client',     args: [...baseFlags, '-f', 'ba[ext=m4a]/ba', '--extractor-args', 'youtube:player_client=tvhtml5', ytUrl] },
+    { name: 'Android Music', args: [...baseFlags, '-f', 'ba[ext=m4a]/ba', '--extractor-args', 'youtube:player_client=android_music', ytUrl] },
+    { name: 'IPv4 Fallback', args: [...baseFlags, '--force-ipv4', '-f', 'ba[ext=m4a]/ba', ytUrl] },
   ];
 
   let lastError = '';
   for (const attempt of attempts) {
     try {
       const url = await runYtDlp(attempt.args);
+      assertDirectAudioUrl(url, `yt-dlp ${attempt.name}`);
       console.log(`[Stream] ${attempt.name} succeeded for ${videoId}`);
       streamCache.set(videoId, url);
       return url;
