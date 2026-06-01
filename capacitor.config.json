@@ -1,5 +1,10 @@
 {
   "appId": "com.adarsh.musicplayer",
   "appName": "Adarsh Music Player",
-  "webDir": "dist"
+  "webDir": "dist",
+  "plugins": {
+    "CapacitorHttp": {
+      "enabled": true
+    }
+  }
 }

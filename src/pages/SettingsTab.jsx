@@ -1,4 +1,4 @@
-import { Download, LogOut, Moon, Palette, Sparkles, Waves } from 'lucide-react';
+import { Download, LogOut, Moon, Palette, Sparkles, Sun, Waves } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { usePlayerStore } from '../stores/playerStore';
 import { useTheme } from '../services/ThemeContext';
@@ -39,7 +39,7 @@ function Divider() {
 }
 
 const SettingsTab = ({ metadata, onUpdateMetadata, onLogout }) => {
-  const { theme, themes, updateTheme } = useTheme();
+  const { theme, themes, mode, updateTheme, updateMode } = useTheme();
   const [clock, setClock] = useState(() => Date.now());
 
   const lyricsProvider = usePlayerStore((state) => state.lyricsProvider);
@@ -63,6 +63,11 @@ const SettingsTab = ({ metadata, onUpdateMetadata, onLogout }) => {
   const handleThemeChange = async (themeName) => {
     updateTheme(themeName);
     await onUpdateMetadata({ ...metadata, theme: themeName });
+  };
+
+  const handleModeChange = async (nextMode) => {
+    updateMode(nextMode);
+    await onUpdateMetadata({ ...metadata, appearanceMode: nextMode });
   };
 
   const sectionStyle = {
@@ -161,6 +166,48 @@ const SettingsTab = ({ metadata, onUpdateMetadata, onLogout }) => {
         <div style={{ marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
           <Palette size={14} color="var(--accent)" />
           <h3 style={sectionLabelStyle}>Appearance</h3>
+        </div>
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+          gap: '10px',
+          marginBottom: '16px',
+          padding: '6px',
+          borderRadius: '18px',
+          background: 'var(--btn-secondary-bg)',
+          border: '1px solid var(--glass-border)',
+        }}>
+          {[
+            { id: 'dark', label: 'Dark', icon: Moon },
+            { id: 'light', label: 'White', icon: Sun },
+          ].map((option) => {
+            const Icon = option.icon;
+            const isActive = mode === option.id;
+            return (
+              <button
+                key={option.id}
+                type="button"
+                onClick={() => handleModeChange(option.id)}
+                style={{
+                  minHeight: '46px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '9px',
+                  borderRadius: '13px',
+                  background: isActive ? 'var(--btn-primary-bg)' : 'transparent',
+                  color: isActive ? 'var(--btn-primary-text)' : 'var(--text-muted)',
+                  fontWeight: 800,
+                  border: '1px solid transparent',
+                  boxShadow: isActive ? '0 14px 34px var(--accent-glow)' : 'none',
+                  transition: 'all 0.2s ease',
+                }}
+              >
+                <Icon size={16} />
+                {option.label}
+              </button>
+            );
+          })}
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))', gap: '10px' }}>
           {Object.entries(themes).map(([name, palette]) => {

@@ -11,6 +11,7 @@
     "postinstall": "pip install -U yt-dlp || python3 -m pip install -U yt-dlp || python -m pip install -U yt-dlp"
   },
   "dependencies": {
+    "@distube/ytdl-core": "^4.16.12",
     "axios": "^1.15.2",
     "cors": "^2.8.6",
     "express": "^5.2.1",

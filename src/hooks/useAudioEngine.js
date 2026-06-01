@@ -164,15 +164,35 @@ export function useAudioEngine() {
       }
 
       isNewSongLoadingRef.current = true;
-      const nextSrc = musicService.getStreamUrl(currentSong.id, stateRef.current.audioQuality);
-      if (audio.src !== nextSrc) {
-        audio.src = nextSrc;
-        audio.load();
-
-
-      }
+      const srcResult = musicService.getStreamUrl(currentSong.id, stateRef.current.audioQuality);
       
-      audio.volume = stateRef.current.isMuted ? 0 : stateRef.current.volume;
+      Promise.resolve(srcResult).then((nextSrc) => {
+        if (!nextSrc) return;
+        
+        if (audio.src !== nextSrc) {
+          audio.src = nextSrc;
+          audio.load();
+        }
+        
+        audio.volume = stateRef.current.isMuted ? 0 : stateRef.current.volume;
+
+        if (stateRef.current.isPlaying) {
+          audio.play().catch((err) => {
+            if (err?.name !== 'AbortError') setPlaying(false);
+          }).finally(() => {
+            isNewSongLoadingRef.current = false;
+          });
+        } else {
+          isNewSongLoadingRef.current = false;
+        }
+      }).catch((err) => {
+        console.error("[AudioEngine] Stream resolution failed:", err);
+        isNewSongLoadingRef.current = false;
+        setLoading(false);
+        setPlaying(false);
+        // Force the audio player's error listener to trigger and skip to the next track
+        setTimeout(() => playNext(), 2000);
+      });
 
       loadingTimeoutRef.current = setTimeout(() => {
         if (!audio.duration) {
@@ -181,16 +201,6 @@ export function useAudioEngine() {
           playNext();
         }
       }, 35000);
-
-      if (stateRef.current.isPlaying) {
-        audio.play().catch((err) => {
-          if (err?.name !== 'AbortError') setPlaying(false);
-        }).finally(() => {
-          isNewSongLoadingRef.current = false;
-        });
-      } else {
-        isNewSongLoadingRef.current = false;
-      }
     };
 
     if (stateRef.current.crossfade && !audio.paused && audio.readyState >= 2) {

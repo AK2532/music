@@ -76,8 +76,8 @@ const fragmentShader = `
 
 function DarkGlassPaint() {
   const materialRef = useRef();
-  const { theme, themes } = useTheme();
-  const currentPalette = themes[theme] || themes.black;
+  const { theme, themes, activePalette } = useTheme();
+  const currentPalette = activePalette || themes[theme] || themes.black;
 
   const uniforms = useMemo(() => ({
     uTime: { value: 0 },

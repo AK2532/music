@@ -121,50 +121,82 @@ function hexToRgb(hex) {
   return `${r}, ${g}, ${b}`;
 }
 
-function applyThemeVars(palette) {
+function withAppearanceMode(palette, mode = 'dark') {
+  if (!palette || mode !== 'light') return palette;
+
+  const accentRgb = hexToRgb(palette.accent);
+
+  return {
+    ...palette,
+    bg: '#f8fafc',
+    surface: '#ffffff',
+    text: '#0f172a',
+    textMuted: '#64748b',
+    textFaint: '#94a3b8',
+    glassBg: 'rgba(255, 255, 255, 0.78)',
+    glassBorder: `rgba(${accentRgb}, 0.20)`,
+    btnPrimary: palette.accent,
+    btnPrimaryText: '#ffffff',
+    hoverBg: `rgba(${accentRgb}, 0.09)`,
+    activeBg: `rgba(${accentRgb}, 0.16)`,
+    navActiveBg: palette.accent,
+    navActiveText: '#ffffff',
+    cardBg: 'rgba(255, 255, 255, 0.72)',
+    shadow: '0 24px 70px rgba(15, 23, 42, 0.13)',
+    shadowHover: '0 34px 92px rgba(15, 23, 42, 0.18)',
+    btnSecondaryBg: 'rgba(15, 23, 42, 0.045)',
+    btnSecondaryBorder: 'rgba(15, 23, 42, 0.10)',
+  };
+}
+
+function applyThemeVars(palette, mode = 'dark') {
   if (!palette || typeof document === 'undefined') return;
   const root = document.documentElement;
+  const activePalette = withAppearanceMode(palette, mode);
 
   // ── Core colors
-  root.style.setProperty('--accent', palette.accent);
-  root.style.setProperty('--accent-2', palette.accent2);
-  root.style.setProperty('--accent-rgb', hexToRgb(palette.accent));
-  root.style.setProperty('--accent-2-rgb', hexToRgb(palette.accent2));
-  root.style.setProperty('--accent-glow', `rgba(${hexToRgb(palette.accent)}, 0.40)`);
-  root.style.setProperty('--primary', palette.accent);
-  root.style.setProperty('--bg-main', palette.bg);
-  root.style.setProperty('--surface', palette.surface);
-  root.style.setProperty('--text-main', palette.text);
-  root.style.setProperty('--text-muted', palette.textMuted);
-  root.style.setProperty('--text-faint', palette.textFaint);
-  root.style.setProperty('--glass-bg', palette.glassBg);
-  root.style.setProperty('--glass-border', palette.glassBorder);
+  root.dataset.colorMode = mode;
+  root.style.setProperty('--accent', activePalette.accent);
+  root.style.setProperty('--accent-2', activePalette.accent2);
+  root.style.setProperty('--accent-rgb', hexToRgb(activePalette.accent));
+  root.style.setProperty('--accent-2-rgb', hexToRgb(activePalette.accent2));
+  root.style.setProperty('--accent-glow', `rgba(${hexToRgb(activePalette.accent)}, ${mode === 'light' ? 0.24 : 0.40})`);
+  root.style.setProperty('--primary', activePalette.accent);
+  root.style.setProperty('--bg-main', activePalette.bg);
+  root.style.setProperty('--surface', activePalette.surface);
+  root.style.setProperty('--text-main', activePalette.text);
+  root.style.setProperty('--text-muted', activePalette.textMuted);
+  root.style.setProperty('--text-faint', activePalette.textFaint);
+  root.style.setProperty('--glass-bg', activePalette.glassBg);
+  root.style.setProperty('--glass-border', activePalette.glassBorder);
 
   // ── Interaction states (accent-tinted, not white-tinted)
-  root.style.setProperty('--hover-bg', palette.hoverBg);
-  root.style.setProperty('--active-bg', palette.activeBg);
-  root.style.setProperty('--border-subtle', `rgba(${hexToRgb(palette.text)}, 0.07)`);
+  root.style.setProperty('--hover-bg', activePalette.hoverBg);
+  root.style.setProperty('--active-bg', activePalette.activeBg);
+  root.style.setProperty('--border-subtle', `rgba(${hexToRgb(activePalette.text)}, ${mode === 'light' ? 0.10 : 0.07})`);
 
   // ── Buttons
-  root.style.setProperty('--btn-primary-bg', palette.btnPrimary);
-  root.style.setProperty('--btn-primary-text', palette.btnPrimaryText);
-  root.style.setProperty('--btn-primary-hover', `rgba(${hexToRgb(palette.btnPrimary)}, 0.85)`);
-  root.style.setProperty('--btn-secondary-bg', `rgba(${hexToRgb(palette.text)}, 0.06)`);
-  root.style.setProperty('--btn-secondary-hover', palette.hoverBg);
-  root.style.setProperty('--btn-secondary-border', `rgba(${hexToRgb(palette.accent)}, 0.18)`);
+  root.style.setProperty('--btn-primary-bg', activePalette.btnPrimary);
+  root.style.setProperty('--btn-primary-text', activePalette.btnPrimaryText);
+  root.style.setProperty('--btn-primary-hover', `rgba(${hexToRgb(activePalette.btnPrimary)}, 0.85)`);
+  root.style.setProperty('--btn-secondary-bg', activePalette.btnSecondaryBg || `rgba(${hexToRgb(activePalette.text)}, 0.06)`);
+  root.style.setProperty('--btn-secondary-hover', activePalette.hoverBg);
+  root.style.setProperty('--btn-secondary-border', activePalette.btnSecondaryBorder || `rgba(${hexToRgb(activePalette.accent)}, 0.18)`);
 
   // ── Navigation active
-  root.style.setProperty('--nav-active-bg', palette.navActiveBg);
-  root.style.setProperty('--nav-active-text', palette.navActiveText);
+  root.style.setProperty('--nav-active-bg', activePalette.navActiveBg);
+  root.style.setProperty('--nav-active-text', activePalette.navActiveText);
 
   // ── Components
-  root.style.setProperty('--card-bg', palette.glassBg);
-  root.style.setProperty('--scrollbar-thumb', `rgba(${hexToRgb(palette.accent)}, 0.30)`);
-  root.style.setProperty('--scrollbar-hover', `rgba(${hexToRgb(palette.accent)}, 0.55)`);
+  root.style.setProperty('--card-bg', activePalette.cardBg || activePalette.glassBg);
+  root.style.setProperty('--glass-shadow', activePalette.shadow || '0 24px 64px rgba(0, 0, 0, 0.6)');
+  root.style.setProperty('--glass-shadow-hover', activePalette.shadowHover || '0 32px 80px rgba(0, 0, 0, 0.8)');
+  root.style.setProperty('--scrollbar-thumb', `rgba(${hexToRgb(activePalette.accent)}, 0.30)`);
+  root.style.setProperty('--scrollbar-hover', `rgba(${hexToRgb(activePalette.accent)}, 0.55)`);
 
   // ── Body
-  document.body.style.backgroundColor = palette.bg;
-  document.body.style.color = palette.text;
+  document.body.style.backgroundColor = activePalette.bg;
+  document.body.style.color = activePalette.text;
 }
 
 function getInitialTheme() {
@@ -183,27 +215,44 @@ function getInitialTheme() {
   return 'black';
 }
 
+function getInitialMode() {
+  if (typeof window !== 'undefined') {
+    const saved = window.localStorage.getItem('ak_mode');
+    if (saved === 'light' || saved === 'dark') return saved;
+  }
+  return 'dark';
+}
+
 if (typeof window !== 'undefined') {
-  applyThemeVars(paletteMap[getInitialTheme()]);
+  applyThemeVars(paletteMap[getInitialTheme()], getInitialMode());
 }
 
 export const ThemeProvider = ({ children }) => {
   const [theme, setTheme] = useState(getInitialTheme);
+  const [mode, setMode] = useState(getInitialMode);
   const themes = useMemo(() => paletteMap, []);
+  const activePalette = useMemo(() => withAppearanceMode(themes[theme] || themes.black, mode), [theme, themes, mode]);
 
   const updateTheme = React.useCallback((colorName) => {
     const next = themes[colorName] ? colorName : 'black';
     setTheme(next);
-    applyThemeVars(themes[next]);
+    applyThemeVars(themes[next], mode);
     if (typeof window !== 'undefined') window.localStorage.setItem('ak_theme', next);
-  }, [themes]);
+  }, [themes, mode]);
+
+  const updateMode = React.useCallback((nextMode) => {
+    const next = nextMode === 'light' ? 'light' : 'dark';
+    setMode(next);
+    applyThemeVars(themes[theme] || themes.black, next);
+    if (typeof window !== 'undefined') window.localStorage.setItem('ak_mode', next);
+  }, [themes, theme]);
 
   React.useEffect(() => {
-    applyThemeVars(themes[theme]);
-  }, [theme, themes]);
+    applyThemeVars(themes[theme], mode);
+  }, [theme, themes, mode]);
 
   return (
-    <ThemeContext.Provider value={{ theme, themes, updateTheme }}>
+    <ThemeContext.Provider value={{ theme, themes, mode, activePalette, updateTheme, updateMode }}>
       {children}
     </ThemeContext.Provider>
   );
