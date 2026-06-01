@@ -4,6 +4,44 @@
  * directly in the browser/Capacitor environment.
  */
 
+import { Capacitor, CapacitorHttp } from '@capacitor/core';
+
+// Helper function to perform requests natively in Capacitor (bypassing CORS)
+// or using standard fetch in browsers.
+async function performRequest(url, options = {}) {
+  if (Capacitor.isNativePlatform()) {
+    const method = options.method || 'GET';
+    const capOptions = {
+      url,
+      method,
+      headers: options.headers || {},
+    };
+    
+    if (options.body) {
+      if (typeof options.body === 'string') {
+        try {
+          capOptions.data = JSON.parse(options.body);
+        } catch (e) {
+          capOptions.data = options.body;
+        }
+      } else {
+        capOptions.data = options.body;
+      }
+    }
+    
+    const response = await CapacitorHttp.request(capOptions);
+    
+    return {
+      ok: response.status >= 200 && response.status < 300,
+      status: response.status,
+      json: async () => response.data,
+      text: async () => typeof response.data === 'string' ? response.data : JSON.stringify(response.data)
+    };
+  } else {
+    return await fetch(url, options);
+  }
+}
+
 // Helper: traverse JSON keys dynamically (matches ytmusic-api's parser logic)
 const traverse = (data, ...keys) => {
   const again = (data2, key, deadEnd = false) => {
@@ -492,7 +530,7 @@ let config = null;
 async function getClientConfig() {
   if (config) return config;
   try {
-    const res = await fetch("https://music.youtube.com/", {
+    const res = await performRequest("https://music.youtube.com/", {
       headers: {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         "Accept-Language": "en-US,en;q=0.9",
@@ -550,7 +588,7 @@ async function constructRequest(endpoint, body = {}, query = {}) {
   
   const url = `https://music.youtube.com/youtubei/v1/${endpoint}?${searchParams.toString()}`;
   
-  const response = await fetch(url, {
+  const response = await performRequest(url, {
     method: "POST",
     headers,
     body: JSON.stringify({

@@ -4,7 +4,43 @@
  * Uses trusted client profiles (like TVHTML5 and ANDROID_MUSIC) that return non-ciphered, direct URLs.
  */
 
+import { Capacitor, CapacitorHttp } from '@capacitor/core';
+
 const INNER_TUBE_KEY = "AIzaSyAO_J29T0vS8Gg6wW6_8k";
+
+async function performRequest(url, options = {}) {
+  if (Capacitor.isNativePlatform()) {
+    const method = options.method || 'GET';
+    const capOptions = {
+      url,
+      method,
+      headers: options.headers || {},
+    };
+    
+    if (options.body) {
+      if (typeof options.body === 'string') {
+        try {
+          capOptions.data = JSON.parse(options.body);
+        } catch (e) {
+          capOptions.data = options.body;
+        }
+      } else {
+        capOptions.data = options.body;
+      }
+    }
+    
+    const response = await CapacitorHttp.request(capOptions);
+    
+    return {
+      ok: response.status >= 200 && response.status < 300,
+      status: response.status,
+      json: async () => response.data,
+      text: async () => typeof response.data === 'string' ? response.data : JSON.stringify(response.data)
+    };
+  } else {
+    return await fetch(url, options);
+  }
+}
 
 async function fetchPlayer(videoId, clientName, clientVersion) {
   const url = `https://music.youtube.com/youtubei/v1/player?alt=json&key=${INNER_TUBE_KEY}`;
@@ -22,7 +58,7 @@ async function fetchPlayer(videoId, clientName, clientVersion) {
     headers["User-Agent"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
   }
 
-  const response = await fetch(url, {
+  const response = await performRequest(url, {
     method: "POST",
     headers,
     body: JSON.stringify({
