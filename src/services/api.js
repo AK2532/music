@@ -13,28 +13,28 @@ const api = axios.create({
 
 // Environment detection (only true on native Android/iOS app containers)
 const isCapacitor = Capacitor.isNativePlatform();
-const useClientSide = isCapacitor && !HAS_REMOTE_API;
-const useBackend = !useClientSide;
-window.__backendAvailable = useBackend;
+let useClientSide = isCapacitor; // Default to client-side mode on mobile (serverless)
+window.__backendAvailable = !isCapacitor; // Default backend availability to true on Web, false on mobile
 
-// Check backend status when this build is configured to use one.
-if (useBackend) {
-  fetch(`${API_BASE}/health`)
-    .then(r => r.json())
-    .then(data => {
-      if (data?.status === 'ok') {
-        console.log('[API] Local backend server detected. Running in Proxy mode.');
-        window.__backendAvailable = true;
-      } else {
-        console.warn('[API] Local backend server is offline or returned unhealthy status.');
-        window.__backendAvailable = false;
-      }
-    })
-    .catch(() => {
-      console.warn('[API] Local backend server is offline. Please make sure "npm run dev" is running.');
+// Check backend status to dynamically adjust client-side fallback
+fetch(`${API_BASE}/health`)
+  .then(r => r.json())
+  .then(data => {
+    if (data?.status === 'ok') {
+      console.log('[API] Backend server detected. Running in Proxy mode.');
+      window.__backendAvailable = true;
+      useClientSide = false; // Backend is active, use it
+    } else {
+      console.warn('[API] Backend server returned unhealthy status.');
       window.__backendAvailable = false;
-    });
-}
+      useClientSide = isCapacitor; // Fall back to client-side on mobile
+    }
+  })
+  .catch(() => {
+    console.warn('[API] Backend server is offline or unreachable.');
+    window.__backendAvailable = false;
+    useClientSide = isCapacitor; // Fall back to client-side on mobile
+  });
 
 // ─── Formatting Helpers ───────────────────────────────────────────────────────
 function pickThumbnail(item) {

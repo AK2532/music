@@ -228,16 +228,14 @@ export default function Welcome({ initialMode = 'landing' }) {
                   I already have an account
                 </motion.button>
 
-                {Capacitor.isNativePlatform() && (
-                  <motion.button
-                    variants={fadeUp}
-                    onClick={handleDevLogin}
-                    className="button-secondary auth-wide-button"
-                    style={{ border: '1px dashed var(--accent)', color: 'var(--accent)', marginTop: '8px' }}
-                  >
-                    Continue as Guest
-                  </motion.button>
-                )}
+                <motion.button
+                  variants={fadeUp}
+                  onClick={handleDevLogin}
+                  className="button-secondary auth-wide-button"
+                  style={{ border: '1px dashed var(--accent)', color: 'var(--accent)', marginTop: '8px' }}
+                >
+                  Continue as Guest
+                </motion.button>
 
               </motion.aside>
             </motion.div>
