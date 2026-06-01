@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef } from 'react';
-import { Capacitor } from '@capacitor/core';
+import { Capacitor, CapacitorHttp } from '@capacitor/core';
 import { musicService } from '../services/api';
 import { usePlayerStore } from '../stores/playerStore';
 
@@ -123,14 +123,26 @@ export function useAudioEngine() {
       setLoading(true);
       sponsorSegmentsRef.current = [];
 
-      if (stateRef.current.sponsorBlockEnabled && currentSong?.id && window.__backendAvailable) {
-        // Route through our Express proxy to avoid CORS — sponsor.ajay.app blocks direct browser requests
-        fetch(`/api/skip-segments/${currentSong.id}`)
-          .then((response) => (response.ok ? response.json() : []))
-          .then((data) => {
-            if (Array.isArray(data)) sponsorSegmentsRef.current = data;
-          })
-          .catch(() => {});
+      if (stateRef.current.sponsorBlockEnabled && currentSong?.id) {
+        if (IS_NATIVE) {
+          // Native mobile: fetch directly from sponsor.ajay.app bypassing CORS
+          const url = `https://sponsor.ajay.app/api/skipSegments?videoID=${currentSong.id}&categories=["sponsor","music_offtopic","interaction"]`;
+          CapacitorHttp.request({ url, method: 'GET' })
+            .then(res => {
+              if (res.status === 200 && Array.isArray(res.data)) {
+                sponsorSegmentsRef.current = res.data;
+              }
+            })
+            .catch(() => {});
+        } else if (window.__backendAvailable) {
+          // Route through our Express proxy to avoid CORS — sponsor.ajay.app blocks direct browser requests
+          fetch(`/api/skip-segments/${currentSong.id}`)
+            .then((response) => (response.ok ? response.json() : []))
+            .then((data) => {
+              if (Array.isArray(data)) sponsorSegmentsRef.current = data;
+            })
+            .catch(() => {});
+        }
       }
 
       isNewSongLoadingRef.current = true;
