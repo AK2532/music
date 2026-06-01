@@ -628,27 +628,6 @@ app.get('/api/playlist/:playlistId', async (req, res) => {
   }
 });
 
-app.get('/api/album/:albumId', async (req, res) => {
-  const { albumId } = req.params;
-  try {
-    const album = await ytmusic.getAlbum(albumId);
-    const tracks = (album.songs || []).map(s => normalizeTrack(s)).filter(Boolean);
-    res.json(tracks);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-
-app.get('/api/charts', async (req, res) => {
-  try {
-    const results = await ytmusic.searchSongs('top hits');
-    res.json(results.map(s => normalizeTrack(s)).filter(Boolean).slice(0, 20));
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
 // ─── Streaming ────────────────────────────────────────────────────────────────
 const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
 
@@ -671,26 +650,107 @@ async function runYtDlp(args) {
   });
 }
 
+// ─── InnerTube Direct Resolver (PRIMARY — same approach as streamResolver.js on mobile) ─
+// Calls YouTube Music's internal player API directly. No yt-dlp or play-dl required.
+// This is the same method YouTube Music's own app uses internally.
+const INNERTUBE_KEY = 'AIzaSyAO_J29T0vS8Gg6wW6_8k';
+const INNERTUBE_CLIENTS = [
+  { name: 'TVHTML5',      clientName: 'TVHTML5',      clientVersion: '7.20230405.01.00' },
+  { name: 'ANDROID_MUSIC',clientName: 'ANDROID_MUSIC', clientVersion: '6.02.52'         },
+  { name: 'IOS_MUSIC',    clientName: 'IOS_MUSIC',     clientVersion: '6.21'            },
+  { name: 'WEB_REMIX',    clientName: 'WEB_REMIX',     clientVersion: '1.20241022.01.00' },
+];
+
+async function innerTubeFetchPlayer(videoId, clientName, clientVersion) {
+  const response = await axios.post(
+    `https://music.youtube.com/youtubei/v1/player?alt=json&key=${INNERTUBE_KEY}`,
+    {
+      videoId,
+      context: {
+        client: { clientName, clientVersion, gl: 'US', hl: 'en', utcOffsetMinutes: 0 },
+        user: { enableSafetyMode: false },
+      },
+    },
+    {
+      headers: {
+        'Content-Type': 'application/json',
+        'User-Agent': USER_AGENT,
+        'Origin': 'https://music.youtube.com',
+        'Referer': 'https://music.youtube.com/',
+      },
+      timeout: 12000,
+    }
+  );
+  return response.data;
+}
+
+function extractAudioUrlFromPlayerData(data) {
+  const formats = [
+    ...(data.streamingData?.adaptiveFormats || []),
+    ...(data.streamingData?.formats || []),
+  ];
+  // Audio-only streams, highest bitrate first
+  const audioOnly = formats
+    .filter(f => f.mimeType?.startsWith('audio/'))
+    .sort((a, b) => (b.bitrate || 0) - (a.bitrate || 0));
+
+  for (const f of audioOnly) {
+    if (f.url) return f.url;
+    // Handle signatureCipher (rare for TV/Android clients but handle it)
+    if (f.signatureCipher || f.cipher) {
+      const params = new URLSearchParams(f.signatureCipher || f.cipher);
+      const url = params.get('url');
+      if (url) return url;
+    }
+  }
+  // Last resort: any format with a direct URL
+  for (const f of formats) {
+    if (f.url) return f.url;
+  }
+  return null;
+}
+
+async function resolveViaInnerTube(videoId) {
+  for (const client of INNERTUBE_CLIENTS) {
+    try {
+      const data = await innerTubeFetchPlayer(videoId, client.clientName, client.clientVersion);
+      const url = extractAudioUrlFromPlayerData(data);
+      if (url) {
+        console.log(`[Stream] InnerTube/${client.name} succeeded for ${videoId}`);
+        return url;
+      }
+      console.warn(`[Stream] InnerTube/${client.name}: player data had no direct URL for ${videoId}`);
+    } catch (e) {
+      console.warn(`[Stream] InnerTube/${client.name} failed for ${videoId}: ${e.message?.slice(0, 80)}`);
+    }
+  }
+  return null;
+}
+
 async function getStreamUrl(videoId) {
   if (streamCache.has(videoId)) return streamCache.get(videoId);
 
-  // ─── PRIMARY: play-dl (With Cookie Integration) ───
+  // ── STAGE 1: InnerTube (PRIMARY — no cookies, no bot detection) ──────────────
   try {
-    console.log(`[Stream] Attempting play-dl for ${videoId}...`);
-    
-    // Inject cookies into play-dl if available
+    const url = await resolveViaInnerTube(videoId);
+    if (url) {
+      streamCache.set(videoId, url);
+      return url;
+    }
+  } catch (e) {
+    console.warn(`[Stream] InnerTube stage failed entirely for ${videoId}:`, e.message);
+  }
+
+  // ── STAGE 2: play-dl (With Cookie Integration) ────────────────────────────────
+  try {
+    console.log(`[Stream] Falling back to play-dl for ${videoId}...`);
     if (rawCookies) {
       try {
-        await play.setToken({
-          youtube: {
-            cookie: rawCookies
-          }
-        });
+        await play.setToken({ youtube: { cookie: rawCookies } });
       } catch (tokenErr) {
         console.warn('[Stream] play-dl cookie injection failed:', tokenErr.message);
       }
     }
-
     const info = await play.video_info(videoId);
     const format = info.format.find(f => f.hasAudio && !f.hasVideo) || info.format[0];
     if (format?.url) {
@@ -703,40 +763,24 @@ async function getStreamUrl(videoId) {
     console.warn(`[Stream] play-dl failed: ${isBot ? 'BOT DETECTION' : playErr.message.slice(0, 100)}`);
   }
 
-  // ─── SECONDARY: yt-dlp fallback ───
-  if (COOKIES_FILE && existsSync(COOKIES_FILE)) {
-    try {
-      const content = readFileSync(COOKIES_FILE, 'utf-8');
-      if (!content.includes('# Netscape')) {
-        console.error('[Cookies] WARNING: Your YOUTUBE_COOKIES does not look like a Netscape file. It must start with "# Netscape"!');
-      }
-    } catch (e) {
-      console.warn('[Cookies] Failed to verify cookie format:', e.message);
-    }
-  }
-
+  // ── STAGE 3: yt-dlp fallback ──────────────────────────────────────────────────
   const ytUrl = `https://www.youtube.com/watch?v=${videoId}`;
   const baseFlags = [
-    '-g',
-    '--no-warnings',
-    '--no-playlist',
-    '--ignore-config',
-    '--no-check-certificates',
-    '--socket-timeout', '30',
+    '-g', '--no-warnings', '--no-playlist', '--ignore-config',
+    '--no-check-certificates', '--socket-timeout', '30',
     '--user-agent', USER_AGENT,
     '--add-header', 'Accept-Language: en-US,en;q=0.9',
   ];
-
   if (COOKIES_FILE && existsSync(COOKIES_FILE)) {
     baseFlags.push('--cookies', COOKIES_FILE);
   }
 
   const attempts = [
-    { name: 'TV Client', args: [...baseFlags, '-f', 'ba/best', '--extractor-args', 'youtube:player_client=tvhtml5', ytUrl] },
-    { name: 'Android Music', args: [...baseFlags, '-f', 'ba/best', '--extractor-args', 'youtube:player_client=android_music', ytUrl] },
-    { name: 'iOS/Web', args: [...baseFlags, '-f', 'ba[ext=m4a]/ba/best', '--extractor-args', 'youtube:player_client=ios,web', ytUrl] },
-    { name: 'IPv4 Fallback', args: [...baseFlags, '--force-ipv4', '-f', 'ba/best', ytUrl] },
-    { name: 'Emergency', args: [...baseFlags, '-f', 'b/worst', ytUrl] }
+    { name: 'TV Client',    args: [...baseFlags, '-f', 'ba/best', '--extractor-args', 'youtube:player_client=tvhtml5', ytUrl] },
+    { name: 'Android Music',args: [...baseFlags, '-f', 'ba/best', '--extractor-args', 'youtube:player_client=android_music', ytUrl] },
+    { name: 'iOS/Web',      args: [...baseFlags, '-f', 'ba[ext=m4a]/ba/best', '--extractor-args', 'youtube:player_client=ios,web', ytUrl] },
+    { name: 'IPv4 Fallback',args: [...baseFlags, '--force-ipv4', '-f', 'ba/best', ytUrl] },
+    { name: 'Emergency',    args: [...baseFlags, '-f', 'b/worst', ytUrl] }
   ];
 
   let lastError = '';
