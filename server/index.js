@@ -801,28 +801,15 @@ async function getStreamUrl(videoId) {
   throw new Error(`YouTube Blocked: ${lastError.slice(0, 150)}`);
 }
 
+// Returns the resolved CDN audio URL as JSON.
+// The client sets audio.src directly to this URL — no server proxy needed.
+// Proxying through Express causes CDN 403 because YouTube binds stream URLs to
+// the requesting IP/headers. Direct browser fetch matches what InnerTube used.
 app.get('/api/stream/:videoId', async (req, res) => {
   try {
     const url = await getStreamUrl(req.params.videoId);
-    const headers = { 'User-Agent': USER_AGENT, 'Accept': '*/*', 'Connection': 'keep-alive' };
-    if (req.headers.range) headers['Range'] = req.headers.range;
-    const response = await axios({ method: 'get', url, responseType: 'stream', headers, validateStatus: () => true, timeout: 15000 });
-
-    // If the CDN itself rejected the URL (expired or geo-blocked), don't pipe the error body
-    if (response.status >= 400) {
-      console.error(`[Stream] CDN returned ${response.status} for ${req.params.videoId} — clearing cache entry`);
-      streamCache.delete(req.params.videoId); // Evict stale URL so next request re-resolves
-      return res.status(500).json({ error: `CDN rejected stream: HTTP ${response.status}` });
-    }
-
-    res.status(response.status);
-    ['content-type', 'content-length', 'content-range', 'accept-ranges', 'cache-control'].forEach(h => {
-      if (response.headers[h]) res.setHeader(h, response.headers[h]);
-    });
     res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Expose-Headers', 'Content-Length, Content-Range');
-    response.data.on('error', () => res.end());
-    response.data.pipe(res);
+    res.json({ url });
   } catch (error) {
     console.error(`[Stream] Failed for ${req.params.videoId}:`, error.message.slice(0, 150));
     if (!res.headersSent) res.status(500).json({ error: error.message });

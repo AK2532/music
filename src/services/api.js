@@ -449,13 +449,23 @@ export const musicService = {
     );
   },
 
-  getStreamUrl: (videoId, quality = 'high') => {
+  getStreamUrl: async (videoId, quality = 'high') => {
     if (useClientSide) {
-      // Return a Promise representing the direct CDN streaming URL
+      // Native mobile: resolve directly via InnerTube (no backend needed)
       return streamResolver.getStreamUrl(videoId, quality);
     }
-    // Return the string URL for local Express server proxy immediately
-    return `${API_BASE}/stream/${videoId}?quality=${encodeURIComponent(quality)}`;
+    // Web: ask the backend to resolve the CDN URL via InnerTube, then return it directly.
+    // The backend used to proxy the audio bytes but that caused CDN 403 (YouTube binds
+    // stream URLs to the requesting IP/headers). Now we get the URL and set audio.src
+    // to the CDN URL directly — same pattern as mobile.
+    const res = await fetch(`${API_BASE}/stream/${videoId}?quality=${encodeURIComponent(quality)}`);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+      throw new Error(err.error || `Stream resolve failed: HTTP ${res.status}`);
+    }
+    const { url } = await res.json();
+    if (!url) throw new Error(`Backend returned no stream URL for ${videoId}`);
+    return url;
   },
 
   getDownloadUrl: (videoId, title = '') => {

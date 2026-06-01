@@ -105,12 +105,10 @@ export function useAudioEngine() {
   if (audioRef.current == null) {
     const element = new Audio();
     element.preload = 'auto';
-    // On native mobile, crossOrigin='anonymous' causes the CDN to reject the
-    // audio stream with 403 (CORS headers confuse Google's origin-locked CDN URLs).
-    // The audio analyser is also not useful inside a Capacitor WebView.
-    if (!IS_NATIVE) {
-      element.crossOrigin = 'anonymous'; // Allows the Web Audio API visualizer to work on desktop
-    }
+    // Do NOT set crossOrigin='anonymous' — audio.src is a direct CDN URL (googlevideo.com)
+    // on both web and native. YouTube's CDN does not send CORS headers, so crossOrigin
+    // would cause the browser to block playback. The visualizer's Web Audio API
+    // will fail gracefully (already wrapped in try/catch) when the audio is cross-origin.
     audioRef.current = element;
   }
 
