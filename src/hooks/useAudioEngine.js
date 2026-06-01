@@ -173,7 +173,8 @@ export function useAudioEngine() {
       sponsorSegmentsRef.current = [];
 
       if (stateRef.current.sponsorBlockEnabled && currentSong?.id && window.__backendAvailable) {
-        fetch(`https://sponsor.ajay.app/api/skipSegments?videoID=${currentSong.id}&categories=["sponsor","music_offtopic","interaction"]`)
+        // Route through our Express proxy to avoid CORS — sponsor.ajay.app blocks direct browser requests
+        fetch(`/api/skip-segments/${currentSong.id}`)
           .then((response) => (response.ok ? response.json() : []))
           .then((data) => {
             if (Array.isArray(data)) sponsorSegmentsRef.current = data;

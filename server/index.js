@@ -763,6 +763,14 @@ app.get('/api/stream/:videoId', async (req, res) => {
     const headers = { 'User-Agent': USER_AGENT, 'Accept': '*/*', 'Connection': 'keep-alive' };
     if (req.headers.range) headers['Range'] = req.headers.range;
     const response = await axios({ method: 'get', url, responseType: 'stream', headers, validateStatus: () => true, timeout: 15000 });
+
+    // If the CDN itself rejected the URL (expired or geo-blocked), don't pipe the error body
+    if (response.status >= 400) {
+      console.error(`[Stream] CDN returned ${response.status} for ${req.params.videoId} — clearing cache entry`);
+      streamCache.delete(req.params.videoId); // Evict stale URL so next request re-resolves
+      return res.status(500).json({ error: `CDN rejected stream: HTTP ${response.status}` });
+    }
+
     res.status(response.status);
     ['content-type', 'content-length', 'content-range', 'accept-ranges', 'cache-control'].forEach(h => {
       if (response.headers[h]) res.setHeader(h, response.headers[h]);
@@ -772,6 +780,7 @@ app.get('/api/stream/:videoId', async (req, res) => {
     response.data.on('error', () => res.end());
     response.data.pipe(res);
   } catch (error) {
+    console.error(`[Stream] Failed for ${req.params.videoId}:`, error.message.slice(0, 150));
     if (!res.headersSent) res.status(500).json({ error: error.message });
   }
 });
@@ -787,6 +796,25 @@ app.get('/api/download/:videoId', async (req, res) => {
     response.data.pipe(res);
   } catch (error) {
     if (!res.headersSent) res.status(500).json({ error: error.message });
+  }
+});
+
+// SponsorBlock proxy — avoids CORS when the frontend fetches directly from the browser
+app.get('/api/skip-segments/:videoId', async (req, res) => {
+  const { videoId } = req.params;
+  const categories = req.query.categories || '["sponsor","music_offtopic","interaction"]';
+  try {
+    const sbRes = await axios.get(
+      `https://sponsor.ajay.app/api/skipSegments?videoID=${videoId}&categories=${encodeURIComponent(categories)}`,
+      { timeout: 5000, validateStatus: () => true }
+    );
+    if (sbRes.status === 200 && Array.isArray(sbRes.data)) {
+      return res.json(sbRes.data);
+    }
+    // 404 = no segments (normal), anything else = pass through empty
+    return res.json([]);
+  } catch (_) {
+    return res.json([]);
   }
 });
 
