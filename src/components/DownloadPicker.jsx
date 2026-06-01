@@ -2,6 +2,7 @@ import { Modal } from './Modal';
 import { HardDrive, Smartphone, Download, Trash2 } from 'lucide-react';
 import { usePlayerStore } from '../stores/playerStore';
 import { musicService } from '../services/api';
+import { Capacitor } from '@capacitor/core';
 
 export function DownloadPicker() {
   const isOpen = usePlayerStore(state => state.isDownloadPickerOpen);
@@ -62,22 +63,26 @@ export function DownloadPicker() {
           </button>
         )}
 
-        <button className="picker-item" onClick={() => handleSelect('storage')} style={{ textAlign: 'left', width: '100%', padding: '16px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', gap: '16px', color: '#fff' }}>
-          <HardDrive size={24} style={{ color: 'var(--accent)' }} />
-          <div>
-            <strong style={{ display: 'block', fontSize: '1rem' }}>Save to Device</strong>
-            <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Export to phone storage (M4A)</span>
-          </div>
-        </button>
+        {!Capacitor.isNativePlatform() && (
+          <>
+            <button className="picker-item" onClick={() => handleSelect('storage')} style={{ textAlign: 'left', width: '100%', padding: '16px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', gap: '16px', color: '#fff' }}>
+              <HardDrive size={24} style={{ color: 'var(--accent)' }} />
+              <div>
+                <strong style={{ display: 'block', fontSize: '1rem' }}>Save to Device</strong>
+                <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Export to phone storage (M4A)</span>
+              </div>
+            </button>
 
-        {!isDownloadedInApp && (
-          <button className="picker-item" onClick={() => handleSelect('both')} style={{ textAlign: 'left', width: '100%', padding: '16px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', gap: '16px', color: '#fff' }}>
-            <Download size={24} style={{ color: 'var(--accent)' }} />
-            <div>
-              <strong style={{ display: 'block', fontSize: '1rem' }}>Save Both</strong>
-              <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>In-app & Local storage</span>
-            </div>
-          </button>
+            {!isDownloadedInApp && (
+              <button className="picker-item" onClick={() => handleSelect('both')} style={{ textAlign: 'left', width: '100%', padding: '16px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', gap: '16px', color: '#fff' }}>
+                <Download size={24} style={{ color: 'var(--accent)' }} />
+                <div>
+                  <strong style={{ display: 'block', fontSize: '1rem' }}>Save Both</strong>
+                  <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>In-app & Local storage</span>
+                </div>
+              </button>
+            )}
+          </>
         )}
       </div>
     </Modal>

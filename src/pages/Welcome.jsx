@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, ArrowRight, Headphones, Mail, Lock, Eye, EyeOff, User, Sparkles } from 'lucide-react';
 import { supabase } from '../services/supabase';
 import { BrandLogo } from '../components/BrandLogo';
+import { Capacitor } from '@capacitor/core';
 
 // Shared Icons
 const GoogleIcon = () => (
@@ -226,6 +227,17 @@ export default function Welcome({ initialMode = 'landing' }) {
                 >
                   I already have an account
                 </motion.button>
+
+                {Capacitor.isNativePlatform() && (
+                  <motion.button
+                    variants={fadeUp}
+                    onClick={handleDevLogin}
+                    className="button-secondary auth-wide-button"
+                    style={{ border: '1px dashed var(--accent)', color: 'var(--accent)', marginTop: '8px' }}
+                  >
+                    Continue as Guest
+                  </motion.button>
+                )}
 
               </motion.aside>
             </motion.div>
