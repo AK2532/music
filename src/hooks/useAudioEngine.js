@@ -184,10 +184,9 @@ export function useAudioEngine() {
       loadingTimeoutRef.current = setTimeout(() => {
         if (abortController.aborted || loadingSongIdRef.current !== thisSongId) return;
         if (!audio.duration) {
-          console.warn(`[AudioEngine] Load timeout for ${thisSongId}. Skipping.`);
+          console.warn(`[AudioEngine] Load timeout for ${thisSongId}. Stopping playback.`);
           setLoading(false);
           setPlaying(false);
-          playNext();
         }
       }, 35000);
     };
@@ -309,14 +308,12 @@ export function useAudioEngine() {
       consecutiveErrorsRef.current += 1;
 
       if (consecutiveErrorsRef.current >= 3) {
-        // Backend is likely down — stop auto-skipping to avoid an infinite refresh loop
-        console.error('Multiple audio load failures. Stopping auto-skip to prevent refresh loop.');
+        console.error('Multiple audio load failures. Stopping playback to prevent a refresh loop.');
         consecutiveErrorsRef.current = 0;
         return;
       }
 
-      console.error('Audio failed to load. Skipping to next track in 2s.');
-      setTimeout(() => playNext(), 2000);
+      console.error('Audio failed to load. Playback stopped on the selected track.');
     };
 
     audio.addEventListener('timeupdate', onTime);

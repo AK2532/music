@@ -38,14 +38,32 @@ function loadEnvFile(filePath) {
   if (!existsSync(filePath)) return;
   try {
     const lines = readFileSync(filePath, 'utf-8').split(/\r?\n/);
-    for (const line of lines) {
+    for (let i = 0; i < lines.length; i += 1) {
+      let line = lines[i];
       const trimmed = line.trim();
       if (!trimmed || trimmed.startsWith('#')) continue;
       const index = trimmed.indexOf('=');
       if (index <= 0) continue;
       const key = trimmed.slice(0, index).trim();
       let value = trimmed.slice(index + 1).trim();
-      value = value.replace(/^["']|["']$/g, '');
+
+      const quote = value[0];
+      if ((quote === '"' || quote === "'") && !value.endsWith(quote)) {
+        const collected = [value.slice(1)];
+        while (i + 1 < lines.length) {
+          i += 1;
+          line = lines[i];
+          if (line.endsWith(quote)) {
+            collected.push(line.slice(0, -1));
+            break;
+          }
+          collected.push(line);
+        }
+        value = collected.join('\n');
+      } else {
+        value = value.replace(/^["']|["']$/g, '');
+      }
+
       if (!process.env[key]) process.env[key] = value;
     }
   } catch (e) {
@@ -194,7 +212,17 @@ function normalizeBrowseItem(item) {
   if (type === 'album') subtitle = [primaryArtistName(item), item.year].filter(Boolean).join(' • ');
   else if (type === 'playlist') subtitle = 'Playlist';
   else if (type === 'artist') subtitle = 'Artist';
-  return { id, type, title, subtitle, thumbnail: pickThumbnail(item), browseId: item.artistId || item.albumId || null, playlistId: item.playlistId || null };
+  return {
+    id,
+    type,
+    title,
+    subtitle,
+    thumbnail: pickThumbnail(item),
+    browseId: item.artistId || item.albumId || null,
+    playlistId: item.playlistId || null,
+    albumId: item.albumId || null,
+    artistId: item.artistId || null,
+  };
 }
 
 // ─── Health Check ─────────────────────────────────────────────────────────────
@@ -765,6 +793,11 @@ function assertDirectAudioUrl(url, source) {
   return url;
 }
 
+function copyHeader(target, sourceHeaders, name) {
+  const value = sourceHeaders?.[name.toLowerCase()] || sourceHeaders?.[name];
+  if (value !== undefined) target.setHeader(name, value);
+}
+
 async function resolveViaInnerTube(videoId) {
   for (const client of INNERTUBE_CLIENTS) {
     try {
@@ -865,6 +898,68 @@ async function getStreamUrl(videoId) {
   throw new Error(`YouTube Blocked: ${lastError.slice(0, 150)}`);
 }
 
+async function pipeResolvedAudio(req, res, options = {}) {
+  const { videoId } = req.params;
+  const maxAttempts = 2;
+
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    try {
+      const url = await getStreamUrl(videoId);
+      const headers = {
+        'User-Agent': USER_AGENT,
+        'Accept': '*/*',
+        'Accept-Language': 'en-US,en;q=0.9',
+      };
+      if (req.headers.range) headers.Range = req.headers.range;
+
+      const upstream = await axios({
+        method: 'get',
+        url,
+        responseType: 'stream',
+        headers,
+        validateStatus: () => true,
+        timeout: 30000,
+      });
+
+      if ((upstream.status === 403 || upstream.status === 410 || upstream.status === 416) && attempt === 0) {
+        streamCache.delete(videoId);
+        upstream.data?.destroy?.();
+        continue;
+      }
+
+      if (upstream.status >= 400) {
+        upstream.data?.destroy?.();
+        return res.status(upstream.status).json({ error: `Audio upstream returned HTTP ${upstream.status}` });
+      }
+
+      res.status(upstream.status === 206 ? 206 : 200);
+      res.setHeader('Accept-Ranges', 'bytes');
+      res.setHeader('Cache-Control', 'no-store');
+      copyHeader(res, upstream.headers, 'Content-Type');
+      copyHeader(res, upstream.headers, 'Content-Length');
+      copyHeader(res, upstream.headers, 'Content-Range');
+      if (!res.getHeader('Content-Type')) res.setHeader('Content-Type', 'audio/mp4');
+      if (options.downloadName) {
+        res.setHeader('Content-Disposition', `attachment; filename="${options.downloadName.replace(/[\\/:*?"<>|]/g, '_')}.m4a"`);
+      }
+
+      req.on('close', () => upstream.data.destroy());
+      upstream.data.on('error', (error) => {
+        if (!res.destroyed) res.destroy(error);
+      });
+      upstream.data.pipe(res);
+      return;
+    } catch (error) {
+      if (attempt === maxAttempts - 1) {
+        console.error(`[Audio] Failed for ${videoId}:`, error.message.slice(0, 150));
+        if (!res.headersSent) res.status(500).json({ error: error.message });
+        return;
+      }
+      streamCache.delete(videoId);
+    }
+  }
+}
+
 // Returns the resolved CDN audio URL as JSON.
 // The client sets audio.src directly to this URL — no server proxy needed.
 // Proxying through Express causes CDN 403 because YouTube binds stream URLs to
@@ -880,18 +975,12 @@ app.get('/api/stream/:videoId', async (req, res) => {
   }
 });
 
+app.get('/api/audio/:videoId', async (req, res) => {
+  await pipeResolvedAudio(req, res);
+});
+
 app.get('/api/download/:videoId', async (req, res) => {
-  try {
-    const url = await getStreamUrl(req.params.videoId);
-    const response = await axios({ method: 'get', url, responseType: 'stream', headers: { 'User-Agent': USER_AGENT, 'Accept': '*/*' }, validateStatus: () => true, timeout: 30000 });
-    const title = req.query.title || 'download';
-    res.setHeader('Content-Disposition', `attachment; filename="${title.replace(/[\\/:*?"<>|]/g, '_')}.m4a"`);
-    if (response.headers['content-type']) res.setHeader('Content-Type', response.headers['content-type']);
-    if (response.headers['content-length']) res.setHeader('Content-Length', response.headers['content-length']);
-    response.data.pipe(res);
-  } catch (error) {
-    if (!res.headersSent) res.status(500).json({ error: error.message });
-  }
+  await pipeResolvedAudio(req, res, { downloadName: req.query.title || 'download' });
 });
 
 // SponsorBlock proxy — avoids CORS when the frontend fetches directly from the browser

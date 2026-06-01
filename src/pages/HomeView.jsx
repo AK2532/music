@@ -4,6 +4,7 @@ import { ArrowUpToLine, Download, ListMusic, ListPlus, MoreVertical, Pause, Play
 import { gsap } from 'gsap';
 import { MOOD_PARAMS, usePlayerStore } from '../stores/playerStore';
 import { BrandLogo } from '../components/BrandLogo';
+import { musicService } from '../services/api';
 
 const getGreeting = () => {
   const h = new Date().getHours();
@@ -15,6 +16,11 @@ const getGreeting = () => {
 const getItemSubtitle = (item) => {
   const artistName = typeof item.artist === 'object' ? item.artist?.name : item.artist;
   return artistName || item.subtitle || item.description || item.type || 'Collection';
+};
+
+const isPlayableItem = (item) => {
+  const type = item?.type?.toLowerCase();
+  return type === 'song' || type === 'video' || Boolean(item?.videoId && String(item.videoId).length === 11);
 };
 
 const TrackTile = ({ item, onActivate, featured = false, metadata }) => {
@@ -314,7 +320,8 @@ const HomeView = ({ songs = [], sections = [], moods = [], onPlay, onPlayCollect
 
       {/* ── Curated sections from YouTube Music ──────────────────────────── */}
       {sections?.filter(s => !s.title?.toLowerCase().includes('community playlists')).map((section, index) => {
-        const isSongHeavy = section.items.filter(i => i.type === 'song' || i.type === 'video').length > 4;
+        const playableItems = section.items.filter(isPlayableItem);
+        const isSongHeavy = playableItems.length > 4;
 
         // Chunk items into columns of 4 if it's song heavy
         const columns = [];
@@ -339,7 +346,7 @@ const HomeView = ({ songs = [], sections = [], moods = [], onPlay, onPlayCollect
                       <CompactTrackRow
                         key={item.id || item.title}
                         item={item}
-                        onActivate={() => onPlay(item, section.items, true)}
+                        onActivate={() => isPlayableItem(item) ? onPlay(item, playableItems, true) : onPlayCollection(item)}
                         metadata={metadata}
                       />
                     ))}
@@ -353,7 +360,7 @@ const HomeView = ({ songs = [], sections = [], moods = [], onPlay, onPlayCollect
                     key={item.id || `${section.title}-${item.title}`}
                     item={item}
                     featured
-                    onActivate={() => item.type === 'song' || item.type === 'video' ? onPlay(item, section.items, true) : onPlayCollection(item)}
+                    onActivate={() => isPlayableItem(item) ? onPlay(item, playableItems, true) : onPlayCollection(item)}
                   />
                 ))}
               </div>

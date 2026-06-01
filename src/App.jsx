@@ -154,6 +154,29 @@ function normalizeHomeSections(sections = []) {
   }));
 }
 
+function isPlayableTrack(item) {
+  const type = item?.type?.toLowerCase();
+  return type === 'song' || type === 'video' || Boolean(item?.videoId && String(item.videoId).length === 11);
+}
+
+function getCollectionTarget(item) {
+  if (!item) return null;
+  const type = item.type?.toLowerCase();
+  const id = item.playlistId || item.albumId || item.artistId || item.browseId || item.id;
+  if (!id) return null;
+
+  if (item.playlistId || type === 'playlist' || String(id).startsWith('VL') || String(id).startsWith('PL')) {
+    return { kind: 'playlist', targetId: item.playlistId || id };
+  }
+  if (item.albumId || type === 'album' || String(id).startsWith('MPRE')) {
+    return { kind: 'album', targetId: item.albumId || item.browseId || id };
+  }
+  if (item.artistId || type === 'artist') {
+    return { kind: 'artist', targetId: item.artistId || item.browseId || id };
+  }
+  return null;
+}
+
 const App = () => {
   const { updateTheme } = useTheme();
   const [user, setUser] = useState(null);
@@ -331,6 +354,10 @@ const App = () => {
 
   const playSong = useCallback((song, queue = songs, isDiscovery = false) => {
     if (!song) return;
+    if (!isPlayableTrack(song)) {
+      console.warn('Ignoring non-track item passed to playSong:', song);
+      return;
+    }
 
     // Check if we're already playing this exact song
     const isSameSong = currentSong?.id === (song.browseId || song.id);
@@ -362,25 +389,12 @@ const App = () => {
   const playCollection = useCallback(async (item) => {
     if (!item) return;
 
-    let kind = null;
-    let targetId = null;
-
-    if (item.type === 'playlist') {
-      kind = 'playlist';
-      targetId = item.playlistId || item.id;
-    } else if (item.type === 'album') {
-      kind = 'album';
-      targetId = item.browseId || item.id;
-    } else if (item.type === 'artist') {
-      kind = 'artist';
-      targetId = item.browseId || item.id;
-    }
-
-    if (!kind || !targetId) return;
+    const target = getCollectionTarget(item);
+    if (!target) return;
 
     setCollectionLoading(true);
     try {
-      const resolved = await musicService.resolveCollection(kind, targetId);
+      const resolved = await musicService.resolveCollection(target.kind, target.targetId);
       const tracks = normalizeSongs(resolved?.tracks || []);
       if (!tracks.length) return;
       loadQueueAndPlay(tracks, tracks[0]);

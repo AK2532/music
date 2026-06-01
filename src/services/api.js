@@ -13,11 +13,12 @@ const api = axios.create({
 
 // Environment detection (only true on native Android/iOS app containers)
 const isCapacitor = Capacitor.isNativePlatform();
-const useClientSide = isCapacitor;
-window.__backendAvailable = !isCapacitor;
+const useClientSide = isCapacitor && !HAS_REMOTE_API;
+const useBackend = !useClientSide;
+window.__backendAvailable = useBackend;
 
-// Check backend status if not running inside Capacitor (for visual logging only)
-if (!isCapacitor) {
+// Check backend status when this build is configured to use one.
+if (useBackend) {
   fetch(`${API_BASE}/health`)
     .then(r => r.json())
     .then(data => {
@@ -140,7 +141,9 @@ function mapBrowseItem(item) {
     subtitle,
     thumbnail: pickThumbnail({ id, thumbnails: item.thumbnails || [], title }),
     browseId: item.artistId || item.albumId || item.browseId || null,
-    playlistId: item.playlistId || null
+    playlistId: item.playlistId || null,
+    albumId: item.albumId || null,
+    artistId: item.artistId || null,
   };
 }
 
@@ -451,43 +454,13 @@ export const musicService = {
   },
 
   getStreamUrl: async (videoId, quality = 'high') => {
-    const fetchBackendStream = async () => {
-      const res = await fetch(`${API_BASE}/stream/${videoId}?quality=${encodeURIComponent(quality)}&t=${Date.now()}`, {
-        cache: 'no-store',
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
-        throw new Error(err.error || `Stream resolve failed: HTTP ${res.status}`);
-      }
-      const { url } = await res.json();
-      if (!url) throw new Error(`Backend returned no stream URL for ${videoId}`);
-      return url;
-    };
-
-    if (useClientSide && HAS_REMOTE_API) {
-      try {
-        return await fetchBackendStream();
-      } catch (err) {
-        console.warn('[API] Remote stream resolver failed, trying native direct resolver:', err);
-        return streamResolver.getStreamUrl(videoId, quality);
-      }
-    }
-
     if (useClientSide) {
       return streamResolver.getStreamUrl(videoId, quality);
     }
 
-    // Web: ask the backend to resolve the CDN URL, then return it directly.
-    const res = await fetch(`${API_BASE}/stream/${videoId}?quality=${encodeURIComponent(quality)}&t=${Date.now()}`, {
-      cache: 'no-store',
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
-      throw new Error(err.error || `Stream resolve failed: HTTP ${res.status}`);
-    }
-    const { url } = await res.json();
-    if (!url) throw new Error(`Backend returned no stream URL for ${videoId}`);
-    return url;
+    // Backend mode returns a same-origin/API audio endpoint, not a googlevideo URL.
+    // That keeps YouTube's IP-bound CDN URL on the server that resolved it.
+    return `${API_BASE}/audio/${encodeURIComponent(videoId)}?quality=${encodeURIComponent(quality)}&t=${Date.now()}`;
   },
 
   getDownloadUrl: (videoId, title = '') => {
